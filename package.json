@@ -1,0 +1,36 @@
+{
+  "name": "ditroy",
+  "packageManager": "pnpm@11.1.2",
+  "version": "0.1.0",
+  "description": "DITroy v1 console assistant (Node.js)",
+  "main": "dist/index.js",
+  "workspaces": [
+    "layers/*"
+  ],
+  "scripts": {
+    "build": "turbo run build --parallel --ui=tui && tsc-alias -p tsconfig.base.json",
+    "typecheck": "turbo run typecheck --parallel --ui=tui",
+    "start": "pnpm --filter @ditroy/app run start",
+    "dev": "pnpm --filter @ditroy/app run dev",
+    "demo": "pnpm --filter @ditroy/app run demo",
+    "test": "turbo run test",
+    "clean": "node scripts/purge-files.js",
+    "turbo": "turbo",
+    "stop": "dlx turbo stop",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.41",
+    "@vitest/coverage-c8": "^0.33.0",
+    "ts-node": "^10.9.1",
+    "tsc-alias": "^1.8.17",
+    "tsconfig-paths": "^4.2.0",
+    "turbo": "^2.9.14",
+    "typescript": "^5.2.2",
+    "vitest": "^4.1.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

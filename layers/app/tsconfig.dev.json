@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../..",
+    "paths": {
+      "@ditroy/core": ["layers/core/src/index.ts"],
+      "@ditroy/core/*": ["layers/core/src/*"],
+      "@ditroy/interfaces": ["layers/interfaces/src/index.ts"],
+      "@ditroy/interfaces/*": ["layers/interfaces/src/*"],
+      "@ditroy/data": ["layers/data/src/index.ts"],
+      "@ditroy/data/*": ["layers/data/src/*"]
+    }
+  }
+}

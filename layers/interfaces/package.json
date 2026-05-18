@@ -1,0 +1,29 @@
+{
+  "name": "@ditroy/interfaces",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./console/cli": {
+      "types": "./dist/console/cli.d.ts",
+      "default": "./dist/console/cli.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@ditroy/core": "workspace:*",
+    "@ditroy/data": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "@ditroy/app",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "start": "node dist/index.js",
+    "dev": "ts-node -r tsconfig-paths/register -P tsconfig.dev.json src/index.ts",
+    "demo": "ts-node -r tsconfig-paths/register -P tsconfig.dev.json src/index.ts --demo",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@ditroy/interfaces": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0"
+  }
+}

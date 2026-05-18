@@ -1,0 +1,41 @@
+{
+  "name": "@ditroy/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./nlp": {
+      "types": "./dist/nlp/index.d.ts",
+      "default": "./dist/nlp/index.js"
+    },
+    "./dialogue": {
+      "types": "./dist/dialogue/index.d.ts",
+      "default": "./dist/dialogue/index.js"
+    },
+    "./personality": {
+      "types": "./dist/personality/index.d.ts",
+      "default": "./dist/personality/index.js"
+    },
+    "./typo": {
+      "types": "./dist/typo/index.d.ts",
+      "default": "./dist/typo/index.js"
+    },
+    "./search": {
+      "types": "./dist/search/index.d.ts",
+      "default": "./dist/search/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0"
+  }
+}
