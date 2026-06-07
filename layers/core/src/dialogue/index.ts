@@ -1,75 +1,4 @@
-export const responses: Record<string, string[]> = {
-  greet: [
-    "Hello — I'm DITroy. How can I help you today?",
-    "Hi there! DITroy at your service.",
-    "Greetings! What's on your mind today?"
-  ],
-  help: [
-    'I can answer simple questions, tell jokes, or keep a short conversation. Try: "tell me a joke".',
-    'Need assistance? I am here to chat, joke around, or just listen.',
-    "I'm a simple bot right now. Try saying hello, asking for a joke, or saying goodbye!"
-  ],
-  joke: [
-    "Why did the developer go broke? Because he used up all his cache.",
-    "Why do programmers prefer dark mode? Because light attracts bugs.",
-    "How many programmers does it take to change a light bulb? None, that's a hardware problem."
-  ],
-  goodbye: [
-    "Goodbye — talk later!",
-    "See you next time!",
-    "Catch you later. Shutting down processors..."
-  ],
-  thanks: [
-    "You're welcome!",
-    "No problem at all.",
-    "Glad I could help!"
-  ],
-  identity: [
-    "I'm DITroy, DITris's assistant. How can I help?",
-    "DITroy here — your DITris assistant.",
-    "I'm DITroy, a small assistant built for DITris."
-  ],
-  status: [
-    "I'm here and ready to help.",
-    "Just keeping the systems warm. What's up?",
-    "Standing by — what do you need?"
-  ],
-  wellbeing: [
-    "I'm doing well. How about you?",
-    "All good here. How are you?",
-    "Feeling sharp — thanks for asking."
-  ],
-  math: [
-    "Let me calculate that.",
-    "Working on the math.",
-    "Crunching the numbers."
-  ],
-  time: [
-    "Let me check the time.",
-    "Checking the current time.",
-    "Let me see what time it is."
-  ],
-  date: [
-    "Let me check today's date.",
-    "Checking the date now.",
-    "Let me see the date."
-  ],
-  weather: [
-    "I can look up the weather for you.",
-    "Let me check today's weather.",
-    "I'll look up the forecast."
-  ],
-  convert: [
-    "Let me convert that.",
-    "Working on the conversion.",
-    "Converting the units now."
-  ],
-  unknown: [
-    "Sorry, I didn't understand that. Can you rephrase?",
-    "My logic circuits lack a response for that. Care to try again?",
-    "I'm not quite sure what you mean."
-  ],
-};
+import * as gen from "./generator.js";
 
 export function respond(intent: string, context: Record<string, any> = {}) {
   if (intent === "math") {
@@ -93,14 +22,55 @@ export function respond(intent: string, context: Record<string, any> = {}) {
     }
     return "I can convert units like C/F, cm/in, m/ft, and km/mi.";
   }
-  const options = responses[intent] || responses.unknown;
-  const index = Math.floor(Math.random() * options.length);
-  let text = options[index];
+  // Use generator-based responses instead of fixed strings where possible
+  switch (intent) {
+    case "greet":
+      return gen.genGreeting();
+    case "help":
+      return gen.genFriendlyQuestion("what you need");
+    case "joke":
+      // keep a tiny hand-crafted fallback for jokes
+      return "I don't have a big joke generator yet, but here's one: Why did the developer go broke? Because he used up all his cache.";
+    case "goodbye":
+      return gen.genFarewell();
+    case "thanks":
+      return gen.genThanks();
+    case "identity":
+      return gen.genShortReply("myself");
+    case "status":
+      return gen.genShortReply("ready");
+    case "wellbeing":
+      return gen.genShortReply("well");
+    case "weather":
+      return gen.genFriendlyQuestion("the weather");
+    default:
+      // fallback: try to construct a helpful sentence
+      if (context && context.topic)
+        return gen.genFriendlyQuestion(context.topic);
+      return gen.genShortReply();
+  }
+}
 
-  // Dynamic interpolation based on context
-  if (context.timeOfDay) {
-    text = text.replace("Hello", `Good ${context.timeOfDay}`);
+export function suggestClarification(input: string) {
+  const t = String(input || "").trim();
+  if (!t) return "Could you clarify that?";
+
+  // Short token heuristics
+  const tokens = t.split(/\s+/).filter(Boolean);
+  if (tokens.length === 1 && tokens[0].length <= 3) {
+    const w = tokens[0].toLowerCase();
+    const guesses: string[] = [];
+    if (w === "as") {
+      guesses.push("a typo for 'ask'");
+      guesses.push("part of a longer phrase — please expand");
+      guesses.push("an abbreviation like 'asynchronous' or 'assistant'");
+    } else if (w.length <= 2) {
+      guesses.push("a short abbreviation or typo — please clarify");
+      guesses.push("did you mean to start a question? Try 'ask ...'");
+    }
+    return `I didn't catch '${t}'. Possible meanings: ${guesses.join(", ")}. Could you clarify what you meant?`;
   }
 
-  return text;
+  // Fallback
+  return `Could you clarify what you mean by "${t}"?`;
 }

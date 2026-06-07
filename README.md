@@ -43,4 +43,20 @@ Or run the demo directly (requires `ts-node`):
 pnpm run demo
 ```
 
+Generator notes
+---------------
+
+DITroy now includes a lightweight n-gram based response generator that builds a small language model from repository documents (`README.md`, `roadmap.md`, `DITroy_structure_plan.md`) and the word lists in `layers/data/words/`.
+
+Environment variables:
+
+- `DITROY_NGRAM_ORDER` — n-gram order (default: 3)
+- `DITROY_GEN_LENGTH` — default number of words to generate (default: 10)
+
+You can tune these when running the console:
+
+```bash
+DITROY_NGRAM_ORDER=3 DITROY_GEN_LENGTH=12 pnpm --filter @ditroy/app run start
+```
+
 Notes: this repository uses pnpm workspaces defined in `pnpm-workspace.yaml` and `package.json`.

@@ -1,15 +1,20 @@
 import readline from "readline";
-import { parse } from "@ditroy/core/nlp";
-import { respond } from "@ditroy/core/dialogue";
+import { parse, inferIntentFromText, respond } from "@ditroy/core";
 import { decorate } from "@ditroy/core/personality";
 import { basicSearch } from "@ditroy/core/search";
 import { resolveTypos } from "@ditroy/core/typo";
-import { getCachedResponse, saveLearnedResponse } from "@ditroy/data/db";
+import { getCachedResponse } from "@ditroy/data/db";
 
 export async function handleOnce(text: string) {
   // Used for basic stateless testing
   const typo = await resolveTypos(text);
-  const { intent, topic, reasoning, entities } = parse(typo.corrected);
+  const thinkMs = Number(process.env.DITROY_THINK_MS) || 2000;
+  const smartEnabled =
+    process.env.DITROY_SMART === "1" ||
+    process.env.DITROY_SMART === "true" ||
+    process.env.DITROY_SMART === undefined; // default: enabled
+  const parsed = await (parse as any)(typo.corrected, { smart: smartEnabled, thinkMs });
+  const { intent, topic, reasoning, entities } = parsed as any;
   if (intent === "time" || intent === "date") {
     entities.now = new Date();
   }
@@ -30,10 +35,9 @@ export function runConsole() {
   rl.setPrompt("> ");
   rl.prompt();
 
-  let teachingInput: string | null = null;
-  let teachingIntent: string | null = null;
-  let teachingTopic: string | null = null;
-  let teachingReasoning: string | null = null;
+  // teaching mode removed: the assistant will attempt to infer intent automatically
+  let suggestionPendingOriginal: string | null = null;
+  let suggestionText: string | null = null;
 
   rl.on("line", async (line: string) => {
     const text = line.trim();
@@ -42,40 +46,28 @@ export function runConsole() {
       return;
     }
 
-    // 1. If currently in Teaching Mode
-    if (teachingInput) {
-      if (!teachingIntent) {
-        teachingIntent = text.trim() || "custom";
-        console.log("What topic should I record for this?");
-        rl.setPrompt("\x1b[33m(Teach DITroy - Topic) >\x1b[0m ");
+    // If a suggestion is pending, treat this input as acceptance/decline
+    if (suggestionPendingOriginal) {
+      const answer = text.toLowerCase();
+      if (answer === "y" || answer === "yes") {
+        const decorated = decorate(suggestionText || "", { tone: "warm" });
+        console.log(`\n${decorated}\n`);
+        suggestionPendingOriginal = null;
+        suggestionText = null;
+        rl.setPrompt("> ");
         rl.prompt();
         return;
       }
-
-      if (!teachingTopic) {
-        teachingTopic = text.trim() || "custom";
-        console.log("What should I say in response?");
-        rl.setPrompt("\x1b[33m(Teach DITroy - Response) >\x1b[0m ");
-        rl.prompt();
-        return;
-      }
-
-      await saveLearnedResponse(teachingInput, text, {
-        intent: teachingIntent,
-        topic: teachingTopic,
-        reasoning: teachingReasoning ?? "Taught by user.",
-      });
-      console.log(
-        `\x1b[32m[Memory Updated: I will recall this response for next time!]\x1b[0m\n`,
-      );
-      teachingInput = null;
-      teachingIntent = null;
-      teachingTopic = null;
-      teachingReasoning = null;
+      // decline -> do not enter teaching mode; just clear suggestion and continue
+      suggestionPendingOriginal = null;
+      suggestionText = null;
+      console.log("Okay, not using the suggestion.");
       rl.setPrompt("> ");
       rl.prompt();
       return;
     }
+
+    // teaching mode disabled: assistant will try to infer and auto-respond instead of asking the user to teach
 
     // 2. Check Database / Cache first
     const cached = await getCachedResponse(text);
@@ -90,7 +82,16 @@ export function runConsole() {
 
     // 3. Fallback to NLP parsing
     const typo = await resolveTypos(text);
-    const { intent, topic, reasoning, entities } = parse(typo.corrected);
+    const thinkMs = Number(process.env.DITROY_THINK_MS) || 2000;
+    const smartEnabled =
+      process.env.DITROY_SMART === "1" ||
+      process.env.DITROY_SMART === "true" ||
+      process.env.DITROY_SMART === undefined;
+    const parsed = await (parse as any)(typo.corrected, {
+      smart: smartEnabled,
+      thinkMs,
+    });
+    const { intent, topic, reasoning, entities } = parsed as any;
     if (intent === "time" || intent === "date") {
       entities.now = new Date();
     }
@@ -125,13 +126,13 @@ export function runConsole() {
       return;
     }
 
-    // 4. Trigger Teaching Mode for unknowns
+    // 4. When unknown, attempt automatic inference using web search and data; do not prompt user to teach
     if (intent === "unknown") {
-      teachingInput = text;
-      teachingReasoning = reasoningLine;
       console.log(
         `\x1b[90m[Thoughts: ${reasoningLine} -> Intent: ${intent} -> Topic: ${topic}]\x1b[0m`,
       );
+      let inferred = { intent: "unknown", score: 0 };
+        const inferThreshold = Number(process.env.DITROY_INFER_CONF) || 2;
       if (searchEnabled) {
         try {
           const results = await basicSearch(typo.corrected);
@@ -143,13 +144,36 @@ export function runConsole() {
             }
             console.log("");
           }
+          const combined = results
+            .map((r) => `${r.title} ${r.snippet}`)
+            .join(" \n ");
+          if (combined) {
+            inferred = inferIntentFromText(combined);
+          }
         } catch (e) {
           console.warn("Web search failed:", e);
         }
       }
+
+      if (inferred.intent !== "unknown" && inferred.score >= inferThreshold) {
+        console.log(
+          `\x1b[90m[Inferred Intent from web: ${inferred.intent} (score=${inferred.score})]\x1b[0m`,
+        );
+        (entities as any).inferred = true;
+        const inferredIntent = inferred.intent;
+        const base = respond(inferredIntent, entities);
+        const decorated = decorate(base, { tone: "warm" });
+        console.log(
+          `\x1b[90m[Thoughts: ${reasoningLine} | Inferred: ${inferredIntent}]\x1b[0m\n${decorated}\n`,
+        );
+        rl.prompt();
+        return;
+      }
+
+      // still unknown -> auto-generate a friendly clarification or reply using respond()
+      const autoReply = respond("unknown", { topic: typo.corrected });
       console.log("I don't know how to respond to that.");
-      console.log("What intent should I record for this?");
-      rl.setPrompt("\x1b[33m(Teach DITroy - Intent) >\x1b[0m ");
+      console.log(`Suggested reply: ${autoReply}\n`);
       rl.prompt();
       return;
     }
