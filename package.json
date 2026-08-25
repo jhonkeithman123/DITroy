@@ -1,21 +1,20 @@
 {
-  "name": "Ditroy",
+  "name": "ditroy",
+  "private": true,
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node shared/scripts/dev.js",
+    "build": "turbo run build",
+    "lint": "node shared/scripts/lint.js",
+    "test": "node shared/scripts/test.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "devEngines": {
-    "packageManager": {
-      "name": "pnpm",
-      "version": "11.23.0",
-      "onFail": "download"
-    }
+  "devDependencies": {
+    "turbo": "^2.1.3"
   },
-  "packageManager": "pnpm@11.23.0",
-  "type": "module"
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared/*"
+  ]
 }
