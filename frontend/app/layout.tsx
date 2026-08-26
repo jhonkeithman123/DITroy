@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "Ditroy Local Chat",
-  description: "Local-only chat prototype for Ditroy.",
+  title: "DITroy | Personal AI for DITrix",
+  description: "DITroy is the personal AI assistant for DITrix.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body style={{ margin: 0 }}>{children}</body>
     </html>
   );
 }

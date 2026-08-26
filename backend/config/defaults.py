@@ -9,3 +9,5 @@ ENABLE_RAG = os.getenv("ENABLE_RAG", "false").lower() == "true"
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
 API_HOST = os.getenv("API_HOST", "0.0.0.0")
 API_PORT = int(os.getenv("API_PORT", "8000"))
+MEMORY_PATH = os.getenv("MEMORY_PATH", "./data/memory.json")
+MEMORY_TOKEN_BUDGET = int(os.getenv("MEMORY_TOKEN_BUDGET", "768"))
