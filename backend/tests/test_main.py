@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
 
 from app.main import app
 from services.model_client import LocalOllamaClient
-from services.memory import LocalMemoryStore, estimate_tokens
+from services.memory import LocalMemoryStore, SQLiteMemoryStore, create_memory_store, estimate_tokens
 
 client = TestClient(app)
 
@@ -30,6 +30,11 @@ def test_memory_persists_between_store_instances(tmp_path):
 
     context = LocalMemoryStore(path).context("conversation")
     assert "remember this" in context
+
+
+def test_memory_factory_uses_sqlite_backend_by_default(tmp_path):
+    store = create_memory_store(backend="sqlite", path=tmp_path / "factory.sqlite3", token_budget=64)
+    assert isinstance(store, SQLiteMemoryStore)
 
 
 def test_memory_separates_facts_from_recent_turns(tmp_path):
@@ -98,6 +103,22 @@ def test_memory_lists_recent_conversations(tmp_path):
 
     assert conversations[0]["conversation_id"] == "second-chat"
     assert conversations[0]["title"] == "Set up local model"
+
+
+def test_conversation_history_endpoint_returns_messages(monkeypatch, tmp_path):
+    store = LocalMemoryStore(tmp_path / "memory.sqlite3")
+    store.add("history-chat", "user", "Hello there")
+    store.add("history-chat", "assistant", "Hi, how can I help?")
+    monkeypatch.setattr("app.main.memory_store", store)
+
+    response = client.get("/conversations/history-chat/messages")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["conversation_id"] == "history-chat"
+    assert len(payload["messages"]) == 2
+    assert payload["messages"][0]["role"] == "user"
+    assert payload["messages"][1]["role"] == "assistant"
 
 
 def test_generate_falls_back_when_model_returns_no_text(monkeypatch):

@@ -13,6 +13,12 @@ type Message = {
   text: string;
 };
 
+type StoredMessage = {
+  role: string;
+  content: string;
+  created_at: string;
+};
+
 type HealthStatus = {
   status: string;
   model_status?: string;
@@ -165,10 +171,40 @@ export default function Page() {
     }
   }
 
-  function openRecentChat(chat: RecentChat) {
+  async function openRecentChat(chat: RecentChat) {
     setConversationId(chat.conversation_id);
-    setMessages([{ role: "assistant", text: `Continuing: ${chat.title}` }]);
     setActivePanel("chat");
+    setLoading(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/conversations/${chat.conversation_id}/messages?limit=300`,
+      );
+      if (!response.ok) throw new Error("Conversation history failed");
+
+      const data = await response.json();
+      const loaded = ((data.messages ?? []) as StoredMessage[])
+        .filter((entry) => entry?.role === "user" || entry?.role === "assistant")
+        .map((entry) => ({
+          role: entry.role as "user" | "assistant",
+          text: entry.content,
+        }));
+
+      setMessages(
+        loaded.length > 0
+          ? loaded
+          : [{ role: "assistant", text: "This chat has no saved messages yet." }],
+      );
+    } catch {
+      setMessages([
+        {
+          role: "assistant",
+          text: "Unable to load this conversation right now. Please try again.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

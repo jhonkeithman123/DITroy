@@ -3,8 +3,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 from uuid import uuid4
 
-from config.defaults import MEMORY_PATH, MEMORY_TOKEN_BUDGET
-from services.memory import LocalMemoryStore
+from config.defaults import (
+    MEMORY_BACKEND,
+    MEMORY_PATH,
+    MEMORY_TOKEN_BUDGET,
+    SUPABASE_SERVICE_ROLE_KEY,
+    SUPABASE_URL,
+)
+from services.memory import create_memory_store
 from services.model_client import LocalOllamaClient
 
 app = FastAPI(title="DITroy Personal AI API", version="0.1.0")
@@ -30,7 +36,13 @@ app.add_middleware(
 )
 
 model_client = LocalOllamaClient()
-memory_store = LocalMemoryStore(MEMORY_PATH, MEMORY_TOKEN_BUDGET)
+memory_store = create_memory_store(
+    backend=MEMORY_BACKEND,
+    path=MEMORY_PATH,
+    token_budget=MEMORY_TOKEN_BUDGET,
+    supabase_url=SUPABASE_URL,
+    supabase_service_role_key=SUPABASE_SERVICE_ROLE_KEY,
+)
 
 
 class ChatRequest(BaseModel):
@@ -59,6 +71,12 @@ class NewConversationResponse(BaseModel):
     inherited_facts: int
 
 
+class ConversationMessage(BaseModel):
+    role: str
+    content: str
+    created_at: str
+
+
 @app.get("/health")
 def health_check():
     status = model_client.health_check()
@@ -83,6 +101,13 @@ def create_conversation(request: NewConversationRequest):
 @app.get("/conversations")
 def list_conversations():
     return {"conversations": memory_store.list_conversations()}
+
+
+@app.get("/conversations/{conversation_id}/messages")
+def get_conversation_messages(conversation_id: str, limit: int = 200):
+    safe_limit = min(max(1, limit), 1000)
+    messages = memory_store.history(conversation_id, limit=safe_limit)
+    return {"conversation_id": conversation_id, "messages": messages}
 
 
 @app.post("/chat", response_model=ChatResponse)
