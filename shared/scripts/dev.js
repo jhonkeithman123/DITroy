@@ -107,7 +107,7 @@ function warmModel() {
   });
 }
 
-function start(command, args, options) {
+function start(command, args, options = {}) {
   const child = spawn(command, args, {
     ...options,
     cwd: options.cwd ?? root,

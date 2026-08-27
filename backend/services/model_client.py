@@ -75,3 +75,20 @@ class LocalOllamaClient(ModelClient):
             return {"status": "degraded", "provider": "ollama", "model": self.model, "available_models": names}
         except httpx.HTTPError:
             return {"status": "degraded", "provider": "ollama", "model": self.model, "message": "Local Ollama server is not running."}
+
+
+class CustomOllamaClient(LocalOllamaClient):
+    """Ollama client for a custom model built from a Modelfile.
+
+    Custom models use the same generation, health, prompt, and memory pipeline
+    as the base model; only the model name needs to change.
+    """
+
+
+def create_model_client(*, provider: str, model: str, base_url: str) -> ModelClient:
+    provider_name = (provider or "ollama").strip().lower()
+    if provider_name == "ollama":
+        return CustomOllamaClient(base_url=base_url, model=model)
+    if provider_name == "stub":
+        return StubModelClient()
+    raise ValueError(f"Unsupported MODEL_PROVIDER '{provider_name}'. Use 'ollama' or 'stub'.")

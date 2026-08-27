@@ -1,6 +1,8 @@
 import os
 
-MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ggml")
+MODEL_PROVIDER = os.getenv("MODEL_PROVIDER", "ollama")
+MODEL_NAME = os.getenv("MODEL_NAME", os.getenv("OLLAMA_MODEL", "llama3.2"))
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434")
 MODEL_PATH = os.getenv("MODEL_PATH", "")
 OFFLOAD_DIR = os.getenv("OFFLOAD_DIR", "./.offload")
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "512"))

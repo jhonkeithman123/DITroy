@@ -9,9 +9,12 @@ from config.defaults import (
     MEMORY_TOKEN_BUDGET,
     SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_URL,
+    MODEL_NAME,
+    MODEL_PROVIDER,
+    OLLAMA_BASE_URL,
 )
 from services.memory import create_memory_store
-from services.model_client import LocalOllamaClient
+from services.model_client import create_model_client
 
 app = FastAPI(title="DITroy Personal AI API", version="0.1.0")
 AI_IDENTITY = (
@@ -35,7 +38,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model_client = LocalOllamaClient()
+model_client = create_model_client(
+    provider=MODEL_PROVIDER,
+    model=MODEL_NAME,
+    base_url=OLLAMA_BASE_URL,
+)
 memory_store = create_memory_store(
     backend=MEMORY_BACKEND,
     path=MEMORY_PATH,

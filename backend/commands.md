@@ -27,6 +27,22 @@ The launcher starts or reuses Ollama, warms `llama3.2`, starts FastAPI on port 8
 ollama pull llama3.2
 ```
 
+## Use a custom Ollama model
+
+Models created from an Ollama `Modelfile` are supported through the same model client as the base model. The API still adds DITroy identity, saved facts, and recent conversation memory before generation.
+
+For example, after importing or creating a model named `ditroy-custom`:
+
+```powershell
+ollama create ditroy-custom -f .\Modelfile
+$env:MODEL_PROVIDER = "ollama"
+$env:MODEL_NAME = "ditroy-custom"
+$env:OLLAMA_BASE_URL = "http://127.0.0.1:11434"
+pnpm dev
+```
+
+`OLLAMA_MODEL` is also accepted as a compatibility alias for `MODEL_NAME`. No frontend or memory changes are required when switching models.
+
 ## Local memory
 
 Conversation memory is stored using a pluggable backend. The default backend is SQLite (`MEMORY_BACKEND=sqlite`) and stores data at `./data/memory.sqlite3`. Older context is compressed when it exceeds the token budget.
@@ -52,5 +68,34 @@ $env:SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
 ```
 
 Note: the Supabase adapter is scaffolded but not fully implemented yet, so keep `MEMORY_BACKEND=sqlite` for active development right now.
+
+## Accounts and authentication
+
+The frontend now includes Supabase email/password sign-in and account creation at `/auth`. Copy `frontend/.env.example` to `frontend/.env.local` and set the public Supabase URL and anon key from your project settings:
+
+```powershell
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
+
+When those values are present, the chat workspace redirects unauthenticated visitors to `/auth` and exposes sign out from the profile panel. When they are absent, local development can continue through the local fallback. Backend token verification and per-user conversation ownership should be enabled before making the API public.
+
+## Resend email delivery
+
+Supabase sends authentication emails through its configured SMTP provider. The backend does not need to call Resend directly.
+
+1. In Resend, verify the domain you will send from and create a new API key.
+2. In Supabase, open **Project Settings -> Authentication -> SMTP Settings**.
+3. Enter:
+	- SMTP host: `smtp.resend.com`
+	- Port: `587`
+	- Username: `resend`
+	- Password: the new Resend API key
+	- Sender email: an address on your verified domain
+	- Sender name: `DITroy`
+4. Under **Authentication -> URL Configuration**, set the site URL and add the frontend URL with `/auth` as an allowed redirect URL.
+5. Under **Authentication -> Providers -> Email**, enable **Confirm email**.
+
+Do not store the Resend API key in the frontend or commit it to the repository. If a key is ever exposed, revoke it in Resend and create a replacement.
 
 If port 3000 or 8000 is already in use, the launcher stops and reports the occupied port. Stop that program first, then run `pnpm dev` again.

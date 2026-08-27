@@ -8,7 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from app.main import app
-from services.model_client import LocalOllamaClient
+from services.model_client import CustomOllamaClient, LocalOllamaClient, create_model_client
 from services.memory import LocalMemoryStore, SQLiteMemoryStore, create_memory_store, estimate_tokens
 
 client = TestClient(app)
@@ -134,6 +134,17 @@ def test_generate_falls_back_when_model_returns_no_text(monkeypatch):
     model = LocalOllamaClient(base_url="http://127.0.0.1:11434")
     response = model.generate("hello")
     assert "hello" in response
+
+
+def test_custom_model_uses_shared_ollama_client_contract():
+    model = create_model_client(
+        provider="ollama",
+        model="ditroy-custom",
+        base_url="http://127.0.0.1:11434",
+    )
+
+    assert isinstance(model, CustomOllamaClient)
+    assert model.model == "ditroy-custom"
 
 
 def test_health_check():

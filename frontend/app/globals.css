@@ -1,0 +1,33 @@
+.ditroy-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+
+.ditroy-scroll::-webkit-scrollbar,
+.ditroy-composer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.ditroy-scroll::-webkit-scrollbar-track,
+.ditroy-composer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ditroy-scroll::-webkit-scrollbar-thumb,
+.ditroy-composer::-webkit-scrollbar-thumb {
+  background: #475569;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background-clip: padding-box;
+}
+
+.ditroy-skeleton {
+  background: linear-gradient(90deg, rgba(148,163,184,.08), rgba(148,163,184,.18), rgba(148,163,184,.08));
+  background-size: 200% 100%;
+  animation: ditroy-shimmer 1.6s infinite;
+}
+
+@keyframes ditroy-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
