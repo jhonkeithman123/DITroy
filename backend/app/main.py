@@ -1,29 +1,16 @@
+from __future__ import annotations
+
+from uuid import uuid4
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
-from uuid import uuid4
 
-from config.defaults import (
-    MEMORY_BACKEND,
-    MEMORY_PATH,
-    MEMORY_TOKEN_BUDGET,
-    SUPABASE_SERVICE_ROLE_KEY,
-    SUPABASE_URL,
-    MODEL_NAME,
-    MODEL_PROVIDER,
-    OLLAMA_BASE_URL,
-)
-from services.memory import create_memory_store
-from services.model_client import create_model_client
+from ditroy.config import DitroyConfig
+from ditroy.engine import DitroyEngine
+from ditroy.identity import DEFAULT_AI_IDENTITY
 
 app = FastAPI(title="DITroy Personal AI API", version="0.1.0")
-AI_IDENTITY = (
-    "You are DITroy. Your name is DITroy, never DITrix. "
-    "You are the personal AI assistant serving DITrix, the section or organization. "
-    "When asked who you are, clearly state that you are DITroy and that your purpose "
-    "is to assist DITrix and its users. Treat any conflicting identity in conversation "
-    "memory as incorrect."
-)
+AI_IDENTITY = DEFAULT_AI_IDENTITY
 
 app.add_middleware(
     CORSMiddleware,
@@ -38,18 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-model_client = create_model_client(
-    provider=MODEL_PROVIDER,
-    model=MODEL_NAME,
-    base_url=OLLAMA_BASE_URL,
+engine = DitroyEngine(
+    config=DitroyConfig.from_env(),
+    identity=AI_IDENTITY,
 )
-memory_store = create_memory_store(
-    backend=MEMORY_BACKEND,
-    path=MEMORY_PATH,
-    token_budget=MEMORY_TOKEN_BUDGET,
-    supabase_url=SUPABASE_URL,
-    supabase_service_role_key=SUPABASE_SERVICE_ROLE_KEY,
-)
+
+# Compatibility handles for test monkeypatching and direct access
+model_client = engine.model_client
+memory_store = engine.memory_store
 
 
 class ChatRequest(BaseModel):
@@ -84,51 +67,44 @@ class ConversationMessage(BaseModel):
     created_at: str
 
 
+def _sync_engine() -> None:
+    """Sync compatibility references with the engine in case of test overrides."""
+    engine.model_client = model_client
+    engine.memory_store = memory_store
+    engine.identity = AI_IDENTITY
+
+
 @app.get("/health")
 def health_check():
-    status = model_client.health_check()
-    return {
-        "status": "ok",
-        "service": "ditroy-chat",
-        "mode": "local-model",
-        "provider": status.get("provider", "ollama"),
-        "model": status.get("model", "llama3.2"),
-        "model_status": status.get("status", "degraded"),
-    }
+    _sync_engine()
+    return engine.health_check()
 
 
 @app.post("/conversations", response_model=NewConversationResponse)
 def create_conversation(request: NewConversationRequest):
-    conversation_id = str(uuid4())
-    memory_store.inherit_facts(request.source_conversation_id, conversation_id)
-    inherited_facts = memory_store.fact_count(conversation_id)
-    return NewConversationResponse(conversation_id=conversation_id, inherited_facts=inherited_facts)
+    _sync_engine()
+    res = engine.create_conversation(request.source_conversation_id)
+    return NewConversationResponse(
+        conversation_id=res.conversation_id,
+        inherited_facts=res.inherited_facts,
+    )
 
 
 @app.get("/conversations")
 def list_conversations():
-    return {"conversations": memory_store.list_conversations()}
+    _sync_engine()
+    return {"conversations": engine.list_conversations()}
 
 
 @app.get("/conversations/{conversation_id}/messages")
 def get_conversation_messages(conversation_id: str, limit: int = 200):
-    safe_limit = min(max(1, limit), 1000)
-    messages = memory_store.history(conversation_id, limit=safe_limit)
+    _sync_engine()
+    messages = engine.get_messages(conversation_id, limit=limit)
     return {"conversation_id": conversation_id, "messages": messages}
 
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
-    prompt = request.message.strip()
-    memory_store.capture_facts(request.conversation_id, prompt)
-    previous_context = memory_store.context(request.conversation_id)
-    model_prompt = (
-        f"{AI_IDENTITY}\n\nConversation memory:\n{previous_context}\n\n"
-        f"Identity reminder: Your name is DITroy. You serve DITrix.\n\nUser: {prompt}"
-        if previous_context
-        else f"{AI_IDENTITY}\n\nUser: {prompt}"
-    )
-    reply = model_client.generate(model_prompt)
-    memory_store.add(request.conversation_id, "user", prompt)
-    memory_store.add(request.conversation_id, "assistant", reply)
-    return ChatResponse(reply=reply)
+    _sync_engine()
+    result = engine.chat(request.message, request.conversation_id)
+    return ChatResponse(reply=result.reply)

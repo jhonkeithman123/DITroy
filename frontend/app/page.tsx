@@ -15,6 +15,7 @@ import { HistoryPanel } from "./components/HistoryPanel";
 import { ProfilePanel } from "./components/ProfilePanel";
 import { Sidebar } from "./components/Sidebar";
 import { WorkspaceHeader } from "./components/WorkspaceHeader";
+import { DitroyClient } from "@131fgh/ditroy-client";
 import type {
   Message,
   Panel,
@@ -23,6 +24,7 @@ import type {
 } from "./components/types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const ditroy = new DitroyClient({ baseUrl: API_BASE_URL });
 const MIN_COMPOSER_HEIGHT = 96;
 const MAX_COMPOSER_HEIGHT = 220;
 
@@ -106,9 +108,9 @@ export default function Page() {
   }, [message]);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/health`)
-      .then((response) => response.json())
-      .then(setHealth)
+    ditroy
+      .getHealth()
+      .then((data) => setHealth(data as unknown as HealthStatus))
       .catch(() =>
         setHealth({
           status: "offline",
@@ -121,9 +123,8 @@ export default function Page() {
 
   async function fetchRecentChats() {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations`);
-      if (!response.ok) throw new Error("Conversation list failed");
-      setRecentChats((await response.json()).conversations ?? []);
+      const data = await ditroy.listConversations();
+      setRecentChats(data.conversations ?? []);
     } catch {
       setRecentChats([]);
     }
@@ -150,16 +151,10 @@ export default function Page() {
     setMessage("");
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: trimmed,
-          conversation_id: conversationId,
-        }),
+      const data = await ditroy.chat({
+        message: trimmed,
+        conversationId,
       });
-      if (!response.ok) throw new Error("Request failed");
-      const data = await response.json();
       setMessages((current) => [
         ...current,
         { role: "assistant", text: data.reply || "No reply returned." },
@@ -180,13 +175,9 @@ export default function Page() {
 
   async function handleNewChat() {
     try {
-      const response = await fetch(`${API_BASE_URL}/conversations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_conversation_id: conversationId }),
+      const data = await ditroy.createConversation({
+        sourceConversationId: conversationId,
       });
-      if (!response.ok) throw new Error("Conversation creation failed");
-      const data = await response.json();
       setConversationId(data.conversation_id);
       setMessages([
         {
@@ -212,13 +203,8 @@ export default function Page() {
     setActivePanel("chat");
     setLoading(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/conversations/${chat.conversation_id}/messages?limit=300`,
-      );
-      if (!response.ok) throw new Error("Conversation history failed");
-      const loaded = (
-        (await response.json()).messages ?? ([] as StoredMessage[])
-      )
+      const data = await ditroy.getMessages(chat.conversation_id, { limit: 300 });
+      const loaded = (data.messages ?? ([] as StoredMessage[]))
         .filter(
           (entry: StoredMessage) =>
             entry.role === "user" || entry.role === "assistant",

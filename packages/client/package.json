@@ -1,0 +1,40 @@
+{
+  "name": "@131fgh/ditroy-client",
+  "version": "0.1.0",
+  "description": "Universal JavaScript and TypeScript SDK for DITroy AI Backend",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rimraf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "node test_sdk.js"
+  },
+  "keywords": [
+    "ditroy",
+    "ai",
+    "sdk",
+    "chatbot",
+    "llm",
+    "ollama",
+    "memory",
+    "typescript"
+  ],
+  "author": "DITroy Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "5.6.2"
+  }
+}

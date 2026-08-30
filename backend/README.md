@@ -1,0 +1,55 @@
+# Ditroy AI Engine (`ditroy-ai`)
+
+Modular personal AI cognitive backend with persistent memory, automated fact extraction, token budgeting, and local LLM orchestration.
+
+## Installation
+
+### From Local Monorepo / Directory
+```bash
+pip install -e /path/to/Ditroy/backend
+```
+
+### From Git Repository
+```bash
+pip install git+https://github.com/jhonkeithman123/DITroy.git#subdirectory=backend
+```
+
+## Quick Start in Any Python Project
+
+```python
+from ditroy import DitroyEngine, DitroyConfig
+
+# 1. Initialize engine with default or custom configuration
+engine = DitroyEngine(
+    config=DitroyConfig(
+        model_name="llama3.2",
+        memory_backend="sqlite",
+        memory_path="./my_memory.sqlite3",
+    )
+)
+
+# 2. Chat with automated fact extraction and memory compression
+result = engine.chat(
+    message='Remember that our project code is "Project Phoenix".',
+    conversation_id="conv_1",
+)
+print(result.reply)
+
+# 3. Create a new conversation session inheriting stored facts
+new_conv = engine.create_conversation(source_conversation_id="conv_1")
+print(f"Created new conversation: {new_conv.conversation_id} with {new_conv.inherited_facts} facts")
+
+# 4. Chat in the new session (facts are remembered!)
+followup = engine.chat(
+    message="What is our project code?",
+    conversation_id=new_conv.conversation_id,
+)
+print(followup.reply)
+```
+
+## Components
+
+- **`DitroyEngine`**: The central orchestrator combining identity, fact extraction, token-budgeted memory context, and model inference.
+- **`ModelClient`**: Abstract interface supporting Ollama (`LocalOllamaClient`, `CustomOllamaClient`) and stubbing (`StubModelClient`).
+- **`MemoryStore`**: Pluggable memory stores with token budget trimming (`SQLiteMemoryStore`, `SupabaseMemoryStore`).
+- **`FastAPI App`**: Included HTTP API at `app.main:app` for network microservice access.
