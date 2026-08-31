@@ -13,6 +13,7 @@ from ditroy.services.memory import (
 )
 from ditroy.services.model_client import (
     CustomOllamaClient,
+    GroqModelClient,
     LocalOllamaClient,
     ModelClient,
     StubModelClient,
@@ -31,6 +32,7 @@ __all__ = [
     "ModelClient",
     "LocalOllamaClient",
     "CustomOllamaClient",
+    "GroqModelClient",
     "StubModelClient",
     "create_model_client",
     "MemoryStore",

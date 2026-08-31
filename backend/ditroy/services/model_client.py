@@ -77,14 +77,100 @@ class LocalOllamaClient(ModelClient):
             return {"status": "degraded", "provider": "ollama", "model": self.model, "message": "Local Ollama server is not running."}
 
 
+class GroqModelClient(ModelClient):
+    """Ultra-fast cloud LLM inference using Groq's OpenAI-compatible API."""
+
+    def __init__(
+        self,
+        api_key: str = "",
+        model: str = "llama-3.3-70b-versatile",
+        base_url: str = "https://api.groq.com/openai/v1",
+    ):
+        self.api_key = (api_key or "").strip()
+        self.model = model or "llama-3.3-70b-versatile"
+        self.base_url = (base_url or "https://api.groq.com/openai/v1").rstrip("/")
+
+    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+        if not self.api_key:
+            logger.warning("Groq API key not configured.")
+            return f"Groq API key missing. Prompt received: {prompt}"
+
+        try:
+            response = httpx.post(
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            choices = payload.get("choices", [])
+            if choices and "message" in choices[0]:
+                content = choices[0]["message"].get("content", "").strip()
+                if content:
+                    return content
+            logger.warning("Groq returned empty response for prompt: %s", prompt)
+            return f"Groq returned no text for: {prompt}"
+        except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
+            logger.warning("Groq model unavailable. I received: %s | error=%s", prompt, exc)
+            return f"Groq unavailable: {exc}"
+
+    def health_check(self) -> dict:
+        if not self.api_key:
+            return {
+                "status": "degraded",
+                "provider": "groq",
+                "model": self.model,
+                "message": "GROQ_API_KEY is not configured.",
+            }
+        try:
+            response = httpx.get(
+                f"{self.base_url}/models",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                timeout=5.0,
+            )
+            if response.status_code == 200:
+                return {"status": "ok", "provider": "groq", "model": self.model}
+            return {
+                "status": "degraded",
+                "provider": "groq",
+                "model": self.model,
+                "message": f"Groq API returned HTTP {response.status_code}",
+            }
+        except httpx.HTTPError:
+            return {
+                "status": "degraded",
+                "provider": "groq",
+                "model": self.model,
+                "message": "Unable to reach Groq API endpoint.",
+            }
+
+
 class CustomOllamaClient(LocalOllamaClient):
     """Ollama client for a custom model built from a Modelfile."""
 
 
-def create_model_client(*, provider: str, model: str, base_url: str) -> ModelClient:
+def create_model_client(
+    *,
+    provider: str,
+    model: str,
+    base_url: str = "http://127.0.0.1:11434",
+    groq_api_key: str = "",
+) -> ModelClient:
     provider_name = (provider or "ollama").strip().lower()
     if provider_name == "ollama":
         return CustomOllamaClient(base_url=base_url, model=model)
+    if provider_name == "groq":
+        return GroqModelClient(api_key=groq_api_key, model=model or "llama-3.3-70b-versatile")
     if provider_name == "stub":
         return StubModelClient()
-    raise ValueError(f"Unsupported MODEL_PROVIDER '{provider_name}'. Use 'ollama' or 'stub'.")
+    raise ValueError(f"Unsupported MODEL_PROVIDER '{provider_name}'. Use 'groq', 'ollama', or 'stub'.")
+

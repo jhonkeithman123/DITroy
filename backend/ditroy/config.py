@@ -25,6 +25,7 @@ class DitroyConfig:
     memory_token_budget: int = 768
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    groq_api_key: str = ""
 
     @classmethod
     def from_env(cls, env_file: str | Path | None = None) -> DitroyConfig:
@@ -52,9 +53,12 @@ class DitroyConfig:
                     pass
                 break
 
+        provider = os.getenv("MODEL_PROVIDER", "ollama")
+        default_model = "llama-3.3-70b-versatile" if provider.lower() == "groq" else "llama3.2"
+
         return cls(
-            model_provider=os.getenv("MODEL_PROVIDER", "ollama"),
-            model_name=os.getenv("MODEL_NAME", os.getenv("OLLAMA_MODEL", "llama3.2")),
+            model_provider=provider,
+            model_name=os.getenv("MODEL_NAME", os.getenv("OLLAMA_MODEL", default_model)),
             ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
             model_path=os.getenv("MODEL_PATH", ""),
             offload_dir=os.getenv("OFFLOAD_DIR", "./.offload"),
@@ -69,4 +73,5 @@ class DitroyConfig:
             memory_token_budget=int(os.getenv("MEMORY_TOKEN_BUDGET", "768")),
             supabase_url=os.getenv("SUPABASE_URL", ""),
             supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
+            groq_api_key=os.getenv("GROQ_API_KEY", ""),
         )

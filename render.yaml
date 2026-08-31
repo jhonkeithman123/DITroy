@@ -7,6 +7,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.10.21
+      - key: MODEL_PROVIDER
+        value: groq
+      - key: MODEL_NAME
+        value: llama-3.3-70b-versatile
+      - key: GROQ_API_KEY
+        sync: false
       - key: MEMORY_BACKEND
         value: supabase
       - key: SUPABASE_URL

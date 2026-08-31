@@ -50,6 +50,7 @@ class DitroyEngine:
             provider=self.config.model_provider,
             model=self.config.model_name,
             base_url=self.config.ollama_base_url,
+            groq_api_key=self.config.groq_api_key,
         )
 
         self.memory_store = memory_store or create_memory_store(
