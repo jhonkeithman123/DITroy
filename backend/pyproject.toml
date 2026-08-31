@@ -7,12 +7,13 @@ name = "ditroy-ai"
 version = "0.1.0"
 description = "Modular personal AI cognitive backend with persistent memory, fact extraction, and local LLM orchestration"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9, <3.14"
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.6",
     "pydantic>=2.9.2",
     "httpx>=0.27.2",
+    "supabase>=2.0.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: ditroy-ai-backend
+    runtime: python
+    buildCommand: "pip install -r backend/requirements.txt && pip install -e backend"
+    startCommand: "python -m uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.21
+      - key: MEMORY_BACKEND
+        value: supabase
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
