@@ -16,6 +16,13 @@ export interface ChatResponse {
   reply: string;
 }
 
+export interface ChatStreamOptions {
+  /** Callback fired whenever a new token arrives from the stream. */
+  onToken?: (token: string) => void;
+  /** Optional AbortSignal to cancel the streaming request early. */
+  signal?: AbortSignal;
+}
+
 export interface NewConversationRequest {
   /** Optional source conversation ID to inherit learned facts from. Defaults to 'default'. */
   source_conversation_id?: string;

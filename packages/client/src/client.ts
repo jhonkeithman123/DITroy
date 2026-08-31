@@ -2,6 +2,7 @@ import { DitroyAPIError, DitroyNetworkError } from "./errors.js";
 import type {
   ChatRequest,
   ChatResponse,
+  ChatStreamOptions,
   ConversationListResponse,
   ConversationMessagesResponse,
   DitroyClientOptions,
@@ -122,6 +123,101 @@ export class DitroyClient {
       method: "POST",
       body: JSON.stringify(payload),
     });
+  }
+
+  /**
+   * Stream a chat response in real-time token-by-token from the DITroy AI backend.
+   *
+   * @param request The text prompt or ChatRequest object.
+   * @param options Optional callbacks (onToken) or AbortSignal.
+   * @returns An AsyncIterableIterator yielding each token as it arrives.
+   */
+  public async *chatStream(
+    request: string | ChatRequest,
+    options: ChatStreamOptions = {},
+  ): AsyncIterableIterator<string> {
+    const fetchFn =
+      this.customFetch ||
+      (typeof fetch !== "undefined" ? fetch.bind(globalThis) : undefined);
+
+    if (!fetchFn) {
+      throw new DitroyNetworkError(
+        "No fetch implementation found. In Node < 18, supply customFetch in DitroyClientOptions.",
+      );
+    }
+
+    const payload: { message: string; conversation_id: string } =
+      typeof request === "string"
+        ? { message: request, conversation_id: "default" }
+        : {
+            message: request.message,
+            conversation_id:
+              request.conversation_id || request.conversationId || "default",
+          };
+
+    const url = `${this.baseUrl}/chat/stream`;
+    const response = await fetchFn(url, {
+      method: "POST",
+      headers: this.headers,
+      body: JSON.stringify(payload),
+      signal: options.signal,
+    });
+
+    if (!response.ok) {
+      let errorBody: unknown;
+      try {
+        errorBody = await response.json();
+      } catch {
+        errorBody = await response.text();
+      }
+      throw new DitroyAPIError(
+        response.status,
+        response.statusText || `HTTP ${response.status}`,
+        errorBody,
+      );
+    }
+
+    if (!response.body) {
+      throw new DitroyNetworkError(
+        "ReadableStream not supported or empty body returned from server.",
+      );
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data: ")) continue;
+          const dataStr = trimmed.slice(6).trim();
+          if (dataStr === "[DONE]") return;
+
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (parsed.token) {
+              options.onToken?.(parsed.token);
+              yield parsed.token;
+            } else if (parsed.error) {
+              throw new DitroyAPIError(500, parsed.error);
+            }
+          } catch (parseErr) {
+            if (parseErr instanceof DitroyAPIError) throw parseErr;
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 
   /**

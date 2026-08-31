@@ -26,6 +26,7 @@ class DitroyConfig:
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     groq_api_key: str = ""
+    cron_secret: str = ""
 
     @classmethod
     def from_env(cls, env_file: str | Path | None = None) -> DitroyConfig:
@@ -74,4 +75,6 @@ class DitroyConfig:
             supabase_url=os.getenv("SUPABASE_URL", ""),
             supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
             groq_api_key=os.getenv("GROQ_API_KEY", ""),
+            cron_secret=os.getenv("CRON_SECRET", ""),
         )
+

@@ -147,27 +147,69 @@ export default function Page() {
     event.preventDefault();
     const trimmed = message.trim();
     if (!trimmed || loading) return;
-    setMessages((current) => [...current, { role: "user", text: trimmed }]);
+
+    setMessages((current) => [
+      ...current,
+      { role: "user", text: trimmed },
+      { role: "assistant", text: "" },
+    ]);
     setMessage("");
     setLoading(true);
+
     try {
-      const data = await ditroy.chat({
+      let accumulated = "";
+      for await (const token of ditroy.chatStream({
         message: trimmed,
         conversationId,
-      });
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", text: data.reply || "No reply returned." },
-      ]);
+      })) {
+        accumulated += token;
+        setMessages((current) => {
+          const next = [...current];
+          const lastIdx = next.length - 1;
+          if (lastIdx >= 0 && next[lastIdx].role === "assistant") {
+            next[lastIdx] = { ...next[lastIdx], text: accumulated };
+          }
+          return next;
+        });
+      }
+
+      if (!accumulated) {
+        const data = await ditroy.chat({ message: trimmed, conversationId });
+        setMessages((current) => {
+          const next = [...current];
+          const lastIdx = next.length - 1;
+          if (lastIdx >= 0 && next[lastIdx].role === "assistant") {
+            next[lastIdx] = { ...next[lastIdx], text: data.reply || "No reply returned." };
+          }
+          return next;
+        });
+      }
       fetchRecentChats();
     } catch {
-      setMessages((current) => [
-        ...current,
-        {
-          role: "assistant",
-          text: "Connection error. Please start the backend and try again.",
-        },
-      ]);
+      try {
+        const data = await ditroy.chat({ message: trimmed, conversationId });
+        setMessages((current) => {
+          const next = [...current];
+          const lastIdx = next.length - 1;
+          if (lastIdx >= 0 && next[lastIdx].role === "assistant") {
+            next[lastIdx] = { ...next[lastIdx], text: data.reply || "No reply returned." };
+          }
+          return next;
+        });
+        fetchRecentChats();
+      } catch {
+        setMessages((current) => {
+          const next = [...current];
+          const lastIdx = next.length - 1;
+          if (lastIdx >= 0 && next[lastIdx].role === "assistant") {
+            next[lastIdx] = {
+              role: "assistant",
+              text: "Connection error. Please check backend connection and try again.",
+            };
+          }
+          return next;
+        });
+      }
     } finally {
       setLoading(false);
     }

@@ -53,3 +53,36 @@ print(followup.reply)
 - **`ModelClient`**: Abstract interface supporting Ollama (`LocalOllamaClient`, `CustomOllamaClient`) and stubbing (`StubModelClient`).
 - **`MemoryStore`**: Pluggable memory stores with token budget trimming (`SQLiteMemoryStore`, `SupabaseMemoryStore`).
 - **`FastAPI App`**: Included HTTP API at `app.main:app` for network microservice access.
+
+## Render Keepalive / Cron Job Endpoint
+
+Render free tier instances sleep after 15 minutes of inactivity. Ditroy provides an exclusive keepalive receiver endpoint:
+
+- **Endpoint**: `GET` / `POST` `/api/cron/keepalive` (aliases: `/cron`, `/ping`)
+- **Sample Response**:
+  ```json
+  {
+    "status": "ok",
+    "message": "Keepalive signal received. Render server will stay awake.",
+    "service": "ditroy-ai-backend",
+    "version": "0.1.0",
+    "uptime_seconds": 3600.0,
+    "uptime_human": "1h 0m 0s",
+    "pings_received": 6,
+    "timestamp": "2026-08-31T06:45:00Z",
+    "last_ping_at": "2026-08-31T06:35:00Z",
+    "model_provider": "groq",
+    "model_name": "openai/gpt-oss-120b",
+    "memory_backend": "supabase"
+  }
+  ```
+
+### Setting Up Free External Keepalive (e.g. cron-job.org / UptimeRobot)
+1. Register on a free ping service such as [cron-job.org](https://cron-job.org) or [UptimeRobot](https://uptimerobot.com).
+2. Create a new cron job / monitor targeting:
+   `https://<YOUR-RENDER-APP>.onrender.com/api/cron/keepalive`
+3. Set the schedule to run every **10 to 14 minutes** (Render sleeps at 15 minutes).
+4. (Optional) If you configure `CRON_SECRET=your_secret_here` in Render environment variables:
+   - Add HTTP Header `Authorization: Bearer your_secret_here` or `X-Cron-Key: your_secret_here`
+   - Or append query param `?key=your_secret_here`
+

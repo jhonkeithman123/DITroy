@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
@@ -97,6 +98,56 @@ class DitroyEngine:
             self.memory_store.add(conversation_id, "assistant", reply)
 
         return ChatResult(reply=reply, conversation_id=conversation_id)
+
+    def chat_stream(
+        self,
+        message: str,
+        conversation_id: str = "default",
+        user_id: str | None = None,
+    ) -> Iterator[str]:
+        """Stream chat tokens in real-time while persisting full turns to memory upon completion."""
+        prompt = message.strip()
+        if not prompt:
+            raise ValueError("Message must not be empty.")
+
+        # 1. Capture quoted facts into long-term memory
+        try:
+            self.memory_store.capture_facts(conversation_id, prompt)
+        except Exception:
+            pass
+
+        # 2. Retrieve compiled context within token budget
+        try:
+            previous_context = self.memory_store.context(conversation_id)
+        except Exception:
+            previous_context = ""
+
+        # 3. Build synthesized prompt
+        model_prompt = build_chat_prompt(
+            identity=self.identity,
+            previous_context=previous_context,
+            user_prompt=prompt,
+        )
+
+        # 4. Stream tokens & accumulate response
+        chunks: list[str] = []
+        for chunk in self.model_client.stream(model_prompt):
+            chunks.append(chunk)
+            yield chunk
+
+        full_reply = "".join(chunks).strip()
+
+        # 5. Persist turns into memory store
+        if full_reply:
+            try:
+                try:
+                    self.memory_store.add(conversation_id, "user", prompt, user_id=user_id)
+                    self.memory_store.add(conversation_id, "assistant", full_reply, user_id=user_id)
+                except TypeError:
+                    self.memory_store.add(conversation_id, "user", prompt)
+                    self.memory_store.add(conversation_id, "assistant", full_reply)
+            except Exception:
+                pass
 
     def create_conversation(
         self,

@@ -17,7 +17,11 @@ logger = logging.getLogger(__name__)
 
 class ModelClient(ABC):
     @abstractmethod
-    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
         raise NotImplementedError
 
     @abstractmethod
@@ -26,8 +30,13 @@ class ModelClient(ABC):
 
 
 class StubModelClient(ModelClient):
-    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7) -> str:
         return f"Echo: {prompt}"
+
+    def stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+        words = f"Echo: {prompt}".split(" ")
+        for i, word in enumerate(words):
+            yield word + (" " if i < len(words) - 1 else "")
 
     def health_check(self) -> dict:
         return {"status": "ok", "provider": "stub"}
@@ -38,7 +47,7 @@ class LocalOllamaClient(ModelClient):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7) -> str:
         try:
             response = httpx.post(
                 f"{self.base_url}/api/generate",
@@ -63,6 +72,37 @@ class LocalOllamaClient(ModelClient):
         except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
             logger.warning("Local model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Local model unavailable. I received: {prompt}"
+
+    def stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self.base_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": True,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                    },
+                },
+                timeout=60.0,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        data = json.loads(line)
+                        chunk = data.get("response", "")
+                        if chunk:
+                            yield chunk
+                    except json.JSONDecodeError:
+                        continue
+        except Exception as exc:
+            logger.warning("Local Ollama stream error: %s", exc)
+            yield f" [Stream error: {exc}]"
 
     def health_check(self) -> dict:
         try:
@@ -152,6 +192,53 @@ class GroqModelClient(ModelClient):
         except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
             logger.warning("Groq model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Groq unavailable: {exc}"
+
+    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+        if not self.api_key:
+            self.api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+        if not self.api_key:
+            logger.warning("Groq API key not configured.")
+            yield f"Groq API key missing. Prompt received: {prompt}"
+            return
+
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                    "max_tokens": max_tokens,
+                    "stream": True,
+                },
+                timeout=60.0,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data: "):
+                        raw = line[6:].strip()
+                        if raw == "[DONE]":
+                            break
+                        try:
+                            payload = json.loads(raw)
+                            choices = payload.get("choices", [])
+                            if choices and "delta" in choices[0]:
+                                content = choices[0]["delta"].get("content", "")
+                                if content:
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
+        except Exception as exc:
+            logger.warning("Groq stream error: %s", exc)
+            yield f" [Stream error: {exc}]"
 
     def health_check(self) -> dict:
         if not self.api_key:
