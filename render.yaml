@@ -10,7 +10,7 @@ services:
       - key: MODEL_PROVIDER
         value: groq
       - key: MODEL_NAME
-        value: llama-3.3-70b-versatile
+        value: openai/gpt-oss-120b
       - key: GROQ_API_KEY
         sync: false
       - key: MEMORY_BACKEND

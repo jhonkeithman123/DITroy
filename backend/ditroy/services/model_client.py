@@ -79,21 +79,29 @@ class LocalOllamaClient(ModelClient):
 
 
 def _normalize_groq_model(model: str) -> str:
-    """Normalize local model names (e.g. 'llama3.2', 'llama3.1') to official Groq model identifiers."""
-    cleaned = (model or "").strip().lower()
+    """Normalize model names to official Groq model identifiers."""
+    cleaned = (model or "").strip()
+    if not cleaned:
+        return "openai/gpt-oss-120b"
+    if "/" in cleaned:
+        return cleaned
+
     mapping = {
-        "llama3.3": "llama-3.3-70b-versatile",
-        "llama3.3-70b": "llama-3.3-70b-versatile",
-        "llama-3.3": "llama-3.3-70b-versatile",
-        "llama3.2": "llama-3.3-70b-versatile",
-        "llama-3.2": "llama-3.3-70b-versatile",
-        "llama3.1": "llama-3.1-8b-instant",
-        "llama-3.1": "llama-3.1-8b-instant",
-        "llama3": "llama-3.1-8b-instant",
-        "mixtral": "mixtral-8x7b-32768",
-        "gemma2": "gemma2-9b-it",
+        "gpt-oss-120b": "openai/gpt-oss-120b",
+        "gpt-oss-20b": "openai/gpt-oss-20b",
+        "120b": "openai/gpt-oss-120b",
+        "20b": "openai/gpt-oss-20b",
+        "qwen3.8-27b": "qwen/qwen3.8-27b",
+        "qwen3.8": "qwen/qwen3.8-27b",
+        "qwen": "qwen/qwen3.8-27b",
+        "compound-mini": "groq/compound-mini",
+        "compound": "groq/compound-mini",
+        "llama3.3": "openai/gpt-oss-120b",
+        "llama3.2": "openai/gpt-oss-120b",
+        "llama3.1": "openai/gpt-oss-20b",
+        "llama": "openai/gpt-oss-120b",
     }
-    return mapping.get(cleaned, model if model and "-" in model else "llama-3.3-70b-versatile")
+    return mapping.get(cleaned.lower(), cleaned)
 
 
 class GroqModelClient(ModelClient):
@@ -102,7 +110,7 @@ class GroqModelClient(ModelClient):
     def __init__(
         self,
         api_key: str = "",
-        model: str = "llama-3.3-70b-versatile",
+        model: str = "openai/gpt-oss-120b",
         base_url: str = "https://api.groq.com/openai/v1",
     ):
         self.api_key = (api_key or os.getenv("GROQ_API_KEY", "")).strip()

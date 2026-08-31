@@ -54,7 +54,7 @@ class DitroyConfig:
                 break
 
         provider = os.getenv("MODEL_PROVIDER", "ollama")
-        default_model = "llama-3.3-70b-versatile" if provider.lower() == "groq" else "llama3.2"
+        default_model = "openai/gpt-oss-120b" if provider.lower() == "groq" else "llama3.2"
 
         return cls(
             model_provider=provider,
