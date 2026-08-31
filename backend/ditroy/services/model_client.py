@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -77,6 +78,24 @@ class LocalOllamaClient(ModelClient):
             return {"status": "degraded", "provider": "ollama", "model": self.model, "message": "Local Ollama server is not running."}
 
 
+def _normalize_groq_model(model: str) -> str:
+    """Normalize local model names (e.g. 'llama3.2', 'llama3.1') to official Groq model identifiers."""
+    cleaned = (model or "").strip().lower()
+    mapping = {
+        "llama3.3": "llama-3.3-70b-versatile",
+        "llama3.3-70b": "llama-3.3-70b-versatile",
+        "llama-3.3": "llama-3.3-70b-versatile",
+        "llama3.2": "llama-3.3-70b-versatile",
+        "llama-3.2": "llama-3.3-70b-versatile",
+        "llama3.1": "llama-3.1-8b-instant",
+        "llama-3.1": "llama-3.1-8b-instant",
+        "llama3": "llama-3.1-8b-instant",
+        "mixtral": "mixtral-8x7b-32768",
+        "gemma2": "gemma2-9b-it",
+    }
+    return mapping.get(cleaned, model if model and "-" in model else "llama-3.3-70b-versatile")
+
+
 class GroqModelClient(ModelClient):
     """Ultra-fast cloud LLM inference using Groq's OpenAI-compatible API."""
 
@@ -86,11 +105,14 @@ class GroqModelClient(ModelClient):
         model: str = "llama-3.3-70b-versatile",
         base_url: str = "https://api.groq.com/openai/v1",
     ):
-        self.api_key = (api_key or "").strip()
-        self.model = model or "llama-3.3-70b-versatile"
+        self.api_key = (api_key or os.getenv("GROQ_API_KEY", "")).strip()
+        self.model = _normalize_groq_model(model)
         self.base_url = (base_url or "https://api.groq.com/openai/v1").rstrip("/")
 
     def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+        if not self.api_key:
+            self.api_key = os.getenv("GROQ_API_KEY", "").strip()
+
         if not self.api_key:
             logger.warning("Groq API key not configured.")
             return f"Groq API key missing. Prompt received: {prompt}"
@@ -124,6 +146,9 @@ class GroqModelClient(ModelClient):
             return f"Groq unavailable: {exc}"
 
     def health_check(self) -> dict:
+        if not self.api_key:
+            self.api_key = os.getenv("GROQ_API_KEY", "").strip()
+
         if not self.api_key:
             return {
                 "status": "degraded",
@@ -169,7 +194,7 @@ def create_model_client(
     if provider_name == "ollama":
         return CustomOllamaClient(base_url=base_url, model=model)
     if provider_name == "groq":
-        return GroqModelClient(api_key=groq_api_key, model=model or "llama-3.3-70b-versatile")
+        return GroqModelClient(api_key=groq_api_key or os.getenv("GROQ_API_KEY", ""), model=model)
     if provider_name == "stub":
         return StubModelClient()
     raise ValueError(f"Unsupported MODEL_PROVIDER '{provider_name}'. Use 'groq', 'ollama', or 'stub'.")

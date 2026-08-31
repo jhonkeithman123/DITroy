@@ -59,7 +59,8 @@ def test_groq_client_generate_success(monkeypatch):
     assert captured_requests[0]["json"]["model"] == "llama-3.3-70b-versatile"
 
 
-def test_groq_client_missing_key():
+def test_groq_client_missing_key(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = GroqModelClient(api_key="")
     reply = client.generate("test prompt")
     assert "Groq API key missing" in reply
