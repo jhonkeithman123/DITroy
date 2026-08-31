@@ -106,8 +106,21 @@ def get_conversation_messages(conversation_id: str, limit: int = 200):
     return {"conversation_id": conversation_id, "messages": messages}
 
 
+import logging
+
+logger = logging.getLogger("ditroy.api")
+
+
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     _sync_engine()
-    result = engine.chat(request.message, request.conversation_id, user_id=request.user_id)
-    return ChatResponse(reply=result.reply)
+    try:
+        result = engine.chat(request.message, request.conversation_id, user_id=request.user_id)
+        return ChatResponse(reply=result.reply)
+    except Exception as exc:
+        logger.error("Error during chat processing: %s", exc, exc_info=True)
+        try:
+            fallback_reply = engine.model_client.generate(request.message)
+            return ChatResponse(reply=fallback_reply)
+        except Exception:
+            return ChatResponse(reply="I am currently experiencing a temporary processing issue. Please try again.")

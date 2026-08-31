@@ -32,9 +32,21 @@ class SQLiteMemoryStore:
     def __init__(self, path: str | Path = "./data/memory.sqlite3", token_budget: int = 768):
         self.path = Path(path)
         self.token_budget = max(8, token_budget)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._migrate_from_legacy_json()
-        self._initialize()
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            import tempfile
+            self.path = Path(tempfile.gettempdir()) / "ditroy_memory.sqlite3"
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            self._migrate_from_legacy_json()
+            self._initialize()
+        except OSError:
+            import tempfile
+            self.path = Path(tempfile.gettempdir()) / "ditroy_memory.sqlite3"
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize()
 
     def add(self, conversation_id: str, role: str, content: str) -> None:
         with self._connect() as connection:
