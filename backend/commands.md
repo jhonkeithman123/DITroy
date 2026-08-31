@@ -43,6 +43,22 @@ pnpm dev
 
 `OLLAMA_MODEL` is also accepted as a compatibility alias for `MODEL_NAME`. No frontend or memory changes are required when switching models.
 
+## Multi-Provider & Automatic Cascading Failover
+
+Ditroy supports automatic failover across multiple free-tier cloud AI providers with local Ollama as the final zero-limit fallback:
+
+```powershell
+$env:MODEL_PROVIDER = "fallback"
+$env:FALLBACK_PROVIDERS = "groq,gemini,deepseek,zai,ollama"
+$env:GROQ_API_KEY = "your-groq-key"
+$env:GEMINI_API_KEY = "your-gemini-key"
+$env:DEEPSEEK_API_KEY = "your-deepseek-key"
+$env:ZAI_API_KEY = "your-zai-key"
+pnpm dev
+```
+
+If Groq hits a `429 Rate Limit`, Ditroy automatically routes to Google Gemini (15 RPM / 1M TPM), then DeepSeek, then Z.AI, and finally local Ollama.
+
 ## Local memory
 
 Conversation memory is stored using a pluggable backend. The default backend is SQLite (`MEMORY_BACKEND=sqlite`) and stores data at `./data/memory.sqlite3`. Older context is compressed when it exceeds the token budget.

@@ -52,6 +52,11 @@ class DitroyEngine:
             model=self.config.model_name,
             base_url=self.config.ollama_base_url,
             groq_api_key=self.config.groq_api_key,
+            gemini_api_key=self.config.gemini_api_key,
+            deepseek_api_key=self.config.deepseek_api_key,
+            zai_api_key=self.config.zai_api_key,
+            openrouter_api_key=self.config.openrouter_api_key,
+            fallback_providers=self.config.fallback_providers,
         )
 
         self.memory_store = memory_store or create_memory_store(

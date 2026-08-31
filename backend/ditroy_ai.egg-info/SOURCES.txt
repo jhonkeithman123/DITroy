@@ -5,6 +5,7 @@ ditroy/config.py
 ditroy/engine.py
 ditroy/identity.py
 ditroy/services/__init__.py
+ditroy/services/keepalive.py
 ditroy/services/memory.py
 ditroy/services/model_client.py
 ditroy_ai.egg-info/PKG-INFO
@@ -12,5 +13,10 @@ ditroy_ai.egg-info/SOURCES.txt
 ditroy_ai.egg-info/dependency_links.txt
 ditroy_ai.egg-info/requires.txt
 ditroy_ai.egg-info/top_level.txt
+tests/test_cron.py
 tests/test_engine.py
+tests/test_groq_client.py
 tests/test_main.py
+tests/test_multi_providers.py
+tests/test_stream.py
+tests/test_supabase_memory.py

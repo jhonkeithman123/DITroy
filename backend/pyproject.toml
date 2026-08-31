@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ditroy-ai"
-version = "0.1.0"
-description = "Modular personal AI cognitive backend with persistent memory, fact extraction, and local LLM orchestration"
+version = "0.2.0"
+description = "Modular personal AI cognitive backend with multi-cloud LLM orchestration, failover pooling, persistent memory, and local Ollama support"
 readme = "README.md"
 requires-python = ">=3.9, <3.14"
 dependencies = [

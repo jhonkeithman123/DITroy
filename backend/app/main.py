@@ -16,7 +16,7 @@ from ditroy.services.keepalive import KeepAliveTracker
 
 logger = logging.getLogger("ditroy.api")
 
-app = FastAPI(title="DITroy Personal AI API", version="0.1.0")
+app = FastAPI(title="DITroy Personal AI API", version="0.2.0")
 AI_IDENTITY = DEFAULT_AI_IDENTITY
 
 app.add_middleware(

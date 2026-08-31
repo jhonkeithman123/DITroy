@@ -2,6 +2,17 @@
  * Core type definitions for the DITroy AI Client SDK.
  */
 
+export type ModelProvider =
+  | "fallback"
+  | "groq"
+  | "gemini"
+  | "deepseek"
+  | "zai"
+  | "openrouter"
+  | "ollama"
+  | "stub"
+  | (string & {});
+
 export interface ChatRequest {
   /** The message prompt to send to the AI. */
   message: string;
@@ -9,6 +20,8 @@ export interface ChatRequest {
   conversation_id?: string;
   /** Alias for conversation_id (camelCase). */
   conversationId?: string;
+  /** Optional user ID for authenticated multi-tenant chats. */
+  user_id?: string | null;
 }
 
 export interface ChatResponse {
@@ -28,6 +41,8 @@ export interface NewConversationRequest {
   source_conversation_id?: string;
   /** Alias for source_conversation_id (camelCase). */
   sourceConversationId?: string;
+  /** Optional user ID for authenticated multi-tenant chats. */
+  user_id?: string | null;
 }
 
 export interface NewConversationResponse {
@@ -61,6 +76,14 @@ export interface ConversationListResponse {
   conversations: RecentChat[];
 }
 
+export interface ProviderHealthDetail {
+  status: string;
+  provider?: string;
+  model?: string;
+  available_models?: string[];
+  message?: string;
+}
+
 export interface HealthStatus {
   status: string;
   service?: string;
@@ -68,8 +91,27 @@ export interface HealthStatus {
   provider?: string;
   model?: string;
   model_status?: string;
+  active_primary?: string;
+  providers?: Record<string, ProviderHealthDetail>;
   available_models?: string[];
   message?: string;
+  uptime_seconds?: number;
+  uptime_human?: string;
+}
+
+export interface KeepaliveStatus {
+  status: string;
+  message: string;
+  service: string;
+  version: string;
+  uptime_seconds: number;
+  uptime_human: string;
+  pings_received: number;
+  timestamp: string;
+  last_ping_at: string | null;
+  model_provider: string;
+  model_name: string;
+  memory_backend: string;
 }
 
 export interface DitroyClientOptions {
@@ -94,6 +136,11 @@ export interface DitroyClientOptions {
    * Optional authentication bearer token (e.g. Supabase JWT).
    */
   authToken?: string;
+
+  /**
+   * Optional secret key for keepalive cron endpoints.
+   */
+  cronSecret?: string;
 
   /**
    * Custom fetch implementation (useful for polyfills, mock environments, or proxying).

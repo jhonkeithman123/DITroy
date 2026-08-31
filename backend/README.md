@@ -1,6 +1,6 @@
 # Ditroy AI Engine (`ditroy-ai`)
 
-Modular personal AI cognitive backend with persistent memory, automated fact extraction, token budgeting, and local LLM orchestration.
+Modular personal AI cognitive backend with persistent memory, automated fact extraction, token budgeting, multi-cloud LLM orchestration, and zero-limit local Ollama fallback.
 
 ## Installation
 
@@ -22,7 +22,7 @@ from ditroy import DitroyEngine, DitroyConfig
 # 1. Initialize engine with default or custom configuration
 engine = DitroyEngine(
     config=DitroyConfig(
-        model_name="llama3.2",
+        model_provider="fallback",  # Auto-failover pool: Groq -> Gemini -> DeepSeek -> Z.AI -> Ollama
         memory_backend="sqlite",
         memory_path="./my_memory.sqlite3",
     )
@@ -47,10 +47,23 @@ followup = engine.chat(
 print(followup.reply)
 ```
 
+## Supported Model Providers & Multi-Provider Cascading Failover
+
+Ditroy includes built-in clients for the top free and high-performance AI providers, plus a **Cascading Failover Pool** (`CascadeModelClient`) that automatically recovers from rate limits (`429`) or provider outages:
+
+| Provider | Provider Identifier | Models Supported | Free Tier Strengths |
+| :--- | :--- | :--- | :--- |
+| **Cascading Pool (Recommended)** | `fallback` / `auto` | Chains all configured keys in priority order | Automatic recovery from 429 rate limits |
+| **Google Gemini** | `gemini` | `gemini-2.0-flash`, `gemini-1.5-flash`, `gemini-1.5-pro` | Generous 15 RPM / 1M TPM / 1,500 RPD |
+| **Groq** | `groq` | `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`, `llama3.3` | Ultra-fast LPU speed (300-500 tok/s) |
+| **DeepSeek** | `deepseek` | `deepseek-chat` (V3), `deepseek-reasoner` (R1) | High intelligence & step-by-step reasoning |
+| **Z.AI / Zhipu GLM** | `zai` / `zhipu` | `glm-4-flash`, `glm-4` | Free GLM-4 tier |
+| **Local Ollama** | `ollama` | `llama3.2`, `deepseek-r1:8b`, `qwen2.5:7b` | **100% Free Forever with Zero Rate Limits** |
+
 ## Components
 
 - **`DitroyEngine`**: The central orchestrator combining identity, fact extraction, token-budgeted memory context, and model inference.
-- **`ModelClient`**: Abstract interface supporting Ollama (`LocalOllamaClient`, `CustomOllamaClient`) and stubbing (`StubModelClient`).
+- **`ModelClient`**: Pluggable interface (`GroqModelClient`, `GeminiModelClient`, `DeepSeekModelClient`, `ZAIModelClient`, `LocalOllamaClient`, `CascadeModelClient`, `StubModelClient`).
 - **`MemoryStore`**: Pluggable memory stores with token budget trimming (`SQLiteMemoryStore`, `SupabaseMemoryStore`).
 - **`FastAPI App`**: Included HTTP API at `app.main:app` for network microservice access.
 
@@ -71,8 +84,7 @@ Render free tier instances sleep after 15 minutes of inactivity. Ditroy provides
     "pings_received": 6,
     "timestamp": "2026-08-31T06:45:00Z",
     "last_ping_at": "2026-08-31T06:35:00Z",
-    "model_provider": "groq",
-    "model_name": "openai/gpt-oss-120b",
+    "model_provider": "fallback",
     "memory_backend": "supabase"
   }
   ```
@@ -85,4 +97,3 @@ Render free tier instances sleep after 15 minutes of inactivity. Ditroy provides
 4. (Optional) If you configure `CRON_SECRET=your_secret_here` in Render environment variables:
    - Add HTTP Header `Authorization: Bearer your_secret_here` or `X-Cron-Key: your_secret_here`
    - Or append query param `?key=your_secret_here`
-

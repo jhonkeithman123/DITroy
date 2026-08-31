@@ -1,7 +1,7 @@
 {
   "name": "@131fgh/ditroy-client",
-  "version": "0.1.0",
-  "description": "Universal JavaScript and TypeScript SDK for DITroy AI Backend",
+  "version": "0.2.0",
+  "description": "Universal JavaScript and TypeScript SDK for DITroy Multi-Provider AI Backend with automated failover and streaming",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -28,7 +28,12 @@
     "sdk",
     "chatbot",
     "llm",
+    "gemini",
+    "groq",
+    "deepseek",
     "ollama",
+    "failover",
+    "streaming",
     "memory",
     "typescript"
   ],

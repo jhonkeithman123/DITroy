@@ -26,6 +26,11 @@ class DitroyConfig:
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     groq_api_key: str = ""
+    gemini_api_key: str = ""
+    deepseek_api_key: str = ""
+    zai_api_key: str = ""
+    openrouter_api_key: str = ""
+    fallback_providers: str = "groq,gemini,deepseek,zai,openrouter,ollama"
     cron_secret: str = ""
 
     @classmethod
@@ -55,7 +60,20 @@ class DitroyConfig:
                 break
 
         provider = os.getenv("MODEL_PROVIDER", "ollama")
-        default_model = "openai/gpt-oss-120b" if provider.lower() == "groq" else "llama3.2"
+        provider_lower = provider.lower()
+
+        if provider_lower == "groq":
+            default_model = "llama-3.3-70b-versatile"
+        elif provider_lower == "gemini":
+            default_model = "gemini-2.0-flash"
+        elif provider_lower == "deepseek":
+            default_model = "deepseek-chat"
+        elif provider_lower in ("zai", "zhipu"):
+            default_model = "glm-4-flash"
+        elif provider_lower == "openrouter":
+            default_model = "meta-llama/llama-3.3-70b-instruct:free"
+        else:
+            default_model = "llama3.2"
 
         return cls(
             model_provider=provider,
@@ -75,6 +93,10 @@ class DitroyConfig:
             supabase_url=os.getenv("SUPABASE_URL", ""),
             supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
             groq_api_key=os.getenv("GROQ_API_KEY", ""),
+            gemini_api_key=os.getenv("GEMINI_API_KEY", ""),
+            deepseek_api_key=os.getenv("DEEPSEEK_API_KEY", ""),
+            zai_api_key=os.getenv("ZAI_API_KEY", os.getenv("ZHIPU_API_KEY", "")),
+            openrouter_api_key=os.getenv("OPENROUTER_API_KEY", ""),
+            fallback_providers=os.getenv("FALLBACK_PROVIDERS", "groq,gemini,deepseek,zai,openrouter,ollama"),
             cron_secret=os.getenv("CRON_SECRET", ""),
         )
-

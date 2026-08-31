@@ -7,18 +7,20 @@ import type {
   ConversationMessagesResponse,
   DitroyClientOptions,
   HealthStatus,
+  KeepaliveStatus,
   NewConversationRequest,
   NewConversationResponse,
 } from "./types.js";
 
 /**
- * Universal client SDK for interacting with the DITroy AI Backend.
+ * Universal client SDK for interacting with the DITroy Multi-Provider AI Backend.
  * Works seamlessly across Node.js, Next.js, Express, browsers, React Native, and Edge runtimes.
  */
 export class DitroyClient {
   public readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly headers: Record<string, string>;
+  private readonly cronSecret?: string;
   private readonly customFetch?: typeof fetch;
 
   constructor(options: DitroyClientOptions = {}) {
@@ -34,9 +36,16 @@ export class DitroyClient {
       "",
     );
     this.timeoutMs = options.timeoutMs ?? 60000;
+    this.cronSecret =
+      options.cronSecret ||
+      (typeof process !== "undefined" && process.env
+        ? process.env.CRON_SECRET
+        : undefined);
+
     this.headers = {
       "Content-Type": "application/json",
       ...(options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
+      ...(this.cronSecret ? { "X-Cron-Key": this.cronSecret } : {}),
       ...(options.headers || {}),
     };
     this.customFetch = options.customFetch;
@@ -110,13 +119,14 @@ export class DitroyClient {
    * @returns ChatResponse containing the AI reply.
    */
   public async chat(request: string | ChatRequest): Promise<ChatResponse> {
-    const payload: { message: string; conversation_id: string } =
+    const payload: { message: string; conversation_id: string; user_id?: string | null } =
       typeof request === "string"
         ? { message: request, conversation_id: "default" }
         : {
             message: request.message,
             conversation_id:
               request.conversation_id || request.conversationId || "default",
+            user_id: request.user_id,
           };
 
     return this.request<ChatResponse>("/chat", {
@@ -146,13 +156,14 @@ export class DitroyClient {
       );
     }
 
-    const payload: { message: string; conversation_id: string } =
+    const payload: { message: string; conversation_id: string; user_id?: string | null } =
       typeof request === "string"
         ? { message: request, conversation_id: "default" }
         : {
             message: request.message,
             conversation_id:
               request.conversation_id || request.conversationId || "default",
+            user_id: request.user_id,
           };
 
     const url = `${this.baseUrl}/chat/stream`;
@@ -234,7 +245,10 @@ export class DitroyClient {
 
     return this.request<NewConversationResponse>("/conversations", {
       method: "POST",
-      body: JSON.stringify({ source_conversation_id: sourceId }),
+      body: JSON.stringify({
+        source_conversation_id: sourceId,
+        user_id: request.user_id,
+      }),
     });
   }
 
@@ -265,11 +279,39 @@ export class DitroyClient {
   }
 
   /**
-   * Check health and availability of the DITroy backend and local model.
+   * Check health, active primary provider, and multi-provider availability of the DITroy backend.
    */
   public async getHealth(): Promise<HealthStatus> {
     return this.request<HealthStatus>("/health", {
       method: "GET",
+    });
+  }
+
+  /**
+   * Retrieve the keepalive status of the Render / cloud deployment.
+   *
+   * @param secret Optional secret override if CRON_SECRET is required.
+   */
+  public async getKeepalive(secret?: string): Promise<KeepaliveStatus> {
+    const key = secret || this.cronSecret;
+    const query = key ? `?key=${encodeURIComponent(key)}` : "";
+    return this.request<KeepaliveStatus>(`/api/cron/keepalive${query}`, {
+      method: "GET",
+      headers: key ? { "X-Cron-Key": key } : undefined,
+    });
+  }
+
+  /**
+   * Send a keepalive ping to prevent the backend from sleeping on Render / free tier hosts.
+   *
+   * @param secret Optional secret override if CRON_SECRET is required.
+   */
+  public async pingKeepalive(secret?: string): Promise<KeepaliveStatus> {
+    const key = secret || this.cronSecret;
+    const query = key ? `?key=${encodeURIComponent(key)}` : "";
+    return this.request<KeepaliveStatus>(`/api/cron/keepalive${query}`, {
+      method: "POST",
+      headers: key ? { "X-Cron-Key": key } : undefined,
     });
   }
 }

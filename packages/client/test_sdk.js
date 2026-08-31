@@ -2,16 +2,18 @@ import assert from "node:assert";
 import { DitroyClient, DitroyAPIError, DitroyNetworkError } from "./dist/index.js";
 
 async function testSDK() {
-  console.log("Testing @ditroy/client SDK...");
+  console.log("Testing @131fgh/ditroy-client SDK v0.2.0...");
 
   // Mock fetch to simulate FastAPI backend responses
   let lastUrl = "";
   let lastMethod = "";
   let lastBody = null;
+  let lastHeaders = {};
 
   const mockFetch = async (url, options = {}) => {
     lastUrl = String(url);
     lastMethod = options.method || "GET";
+    lastHeaders = options.headers || {};
     lastBody = options.body ? JSON.parse(String(options.body)) : null;
 
     if (lastUrl.endsWith("/chat")) {
@@ -65,10 +67,34 @@ async function testSDK() {
         json: async () => ({
           status: "ok",
           service: "ditroy-engine",
-          mode: "local-model",
-          provider: "ollama",
-          model: "llama3.2",
-          model_status: "ok",
+          mode: "multi-provider",
+          provider: "cascade",
+          active_primary: "groq",
+          providers: {
+            groq: { status: "ok", model: "openai/gpt-oss-120b" },
+            gemini: { status: "ok", model: "gemini-3-flash-preview" },
+            ollama: { status: "ok", model: "llama3.2" },
+          },
+        }),
+      };
+    }
+
+    if (lastUrl.includes("/api/cron/keepalive")) {
+      return {
+        ok: true,
+        json: async () => ({
+          status: "ok",
+          message: "Keepalive signal received. Render server will stay awake.",
+          service: "ditroy-ai-backend",
+          version: "0.1.0",
+          uptime_seconds: 3600.0,
+          uptime_human: "1h 0m 0s",
+          pings_received: 42,
+          timestamp: "2026-08-31T21:00:00Z",
+          last_ping_at: "2026-08-31T20:50:00Z",
+          model_provider: "fallback",
+          model_name: "openai/gpt-oss-120b",
+          memory_backend: "supabase",
         }),
       };
     }
@@ -83,6 +109,7 @@ async function testSDK() {
 
   const client = new DitroyClient({
     baseUrl: "http://127.0.0.1:8000",
+    cronSecret: "test-secret-123",
     customFetch: mockFetch,
   });
 
@@ -117,13 +144,27 @@ async function testSDK() {
   assert.strictEqual(msgRes.messages[0].role, "user");
   console.log("✓ client.getMessages() works");
 
-  // 5. Test getHealth
+  // 5. Test getHealth (Multi-Provider Support)
   const healthRes = await client.getHealth();
   assert.strictEqual(healthRes.status, "ok");
-  assert.strictEqual(healthRes.model, "llama3.2");
-  console.log("✓ client.getHealth() works");
+  assert.strictEqual(healthRes.provider, "cascade");
+  assert.strictEqual(healthRes.active_primary, "groq");
+  assert.strictEqual(healthRes.providers.gemini.status, "ok");
+  console.log("✓ client.getHealth() with multi-provider diagnostics works");
 
-  // 6. Test Error Handling
+  // 6. Test Keepalive endpoints
+  const keepaliveRes = await client.getKeepalive();
+  assert.strictEqual(keepaliveRes.status, "ok");
+  assert.strictEqual(keepaliveRes.pings_received, 42);
+  assert.strictEqual(lastHeaders["X-Cron-Key"], "test-secret-123");
+  console.log("✓ client.getKeepalive() works");
+
+  const pingRes = await client.pingKeepalive();
+  assert.strictEqual(pingRes.status, "ok");
+  assert.strictEqual(lastMethod, "POST");
+  console.log("✓ client.pingKeepalive() works");
+
+  // 7. Test Error Handling
   const failingFetch = async () => ({
     ok: false,
     status: 500,
@@ -144,7 +185,7 @@ async function testSDK() {
     console.log("✓ DitroyAPIError handling works");
   }
 
-  console.log("\nAll @ditroy/client SDK tests passed successfully!");
+  console.log("\nAll @131fgh/ditroy-client SDK v0.2.0 tests passed successfully!");
 }
 
 testSDK().catch((err) => {

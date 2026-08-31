@@ -12,15 +12,20 @@ from ditroy.services.memory import (
     estimate_tokens,
 )
 from ditroy.services.model_client import (
+    CascadeModelClient,
     CustomOllamaClient,
+    DeepSeekModelClient,
+    GeminiModelClient,
     GroqModelClient,
     LocalOllamaClient,
     ModelClient,
+    OpenRouterModelClient,
     StubModelClient,
+    ZAIModelClient,
     create_model_client,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "DitroyEngine",
@@ -33,6 +38,11 @@ __all__ = [
     "LocalOllamaClient",
     "CustomOllamaClient",
     "GroqModelClient",
+    "GeminiModelClient",
+    "DeepSeekModelClient",
+    "ZAIModelClient",
+    "OpenRouterModelClient",
+    "CascadeModelClient",
     "StubModelClient",
     "create_model_client",
     "MemoryStore",
