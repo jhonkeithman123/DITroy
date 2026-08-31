@@ -38,6 +38,7 @@ memory_store = engine.memory_store
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     conversation_id: str = Field(default="default", min_length=1, max_length=100)
+    user_id: str | None = Field(default=None)
 
     @field_validator("message")
     @classmethod
@@ -54,6 +55,7 @@ class ChatResponse(BaseModel):
 
 class NewConversationRequest(BaseModel):
     source_conversation_id: str = Field(default="default", min_length=1, max_length=100)
+    user_id: str | None = Field(default=None)
 
 
 class NewConversationResponse(BaseModel):
@@ -83,7 +85,7 @@ def health_check():
 @app.post("/conversations", response_model=NewConversationResponse)
 def create_conversation(request: NewConversationRequest):
     _sync_engine()
-    res = engine.create_conversation(request.source_conversation_id)
+    res = engine.create_conversation(request.source_conversation_id, user_id=request.user_id)
     return NewConversationResponse(
         conversation_id=res.conversation_id,
         inherited_facts=res.inherited_facts,
@@ -106,5 +108,5 @@ def get_conversation_messages(conversation_id: str, limit: int = 200):
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest):
     _sync_engine()
-    result = engine.chat(request.message, request.conversation_id)
+    result = engine.chat(request.message, request.conversation_id, user_id=request.user_id)
     return ChatResponse(reply=result.reply)

@@ -11,7 +11,17 @@ from app.main import app
 from services.model_client import CustomOllamaClient, LocalOllamaClient, create_model_client
 from services.memory import LocalMemoryStore, SQLiteMemoryStore, create_memory_store, estimate_tokens
 
+import pytest
+
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_isolated_test_memory(tmp_path, monkeypatch):
+    test_store = SQLiteMemoryStore(tmp_path / "test_api_memory.sqlite3")
+    monkeypatch.setattr("app.main.memory_store", test_store)
+    monkeypatch.setattr("app.main.engine.memory_store", test_store)
+
 
 
 def test_memory_compresses_old_messages_to_token_budget(tmp_path):
@@ -129,7 +139,7 @@ def test_generate_falls_back_when_model_returns_no_text(monkeypatch):
         def json(self):
             return {}
 
-    monkeypatch.setattr("services.model_client.httpx.post", lambda *args, **kwargs: DummyResponse())
+    monkeypatch.setattr("ditroy.services.model_client.httpx.post", lambda *args, **kwargs: DummyResponse())
 
     model = LocalOllamaClient(base_url="http://127.0.0.1:11434")
     response = model.generate("hello")

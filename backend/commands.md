@@ -55,19 +55,18 @@ $env:MEMORY_PATH = "./data/memory.sqlite3"
 $env:MEMORY_TOKEN_BUDGET = "768"
 ```
 
-## Future Supabase switch (prepared)
+## Supabase cloud database backend
 
-The codebase now includes a backend factory and a Supabase adapter scaffold so migration can be configuration-driven later.
+The backend includes a native Supabase cloud adapter (`SupabaseMemoryStore`) allowing persistent cloud storage across container/serverless restarts.
 
-When you are ready to migrate, set:
+1. Run the database migration script [backend/data/supabase_memory_schema.sql](file:///c:/Users/131fgh/Documents/Ditroy/backend/data/supabase_memory_schema.sql) in your **Supabase Dashboard -> SQL Editor**.
+2. Configure your environment variables:
 
 ```powershell
 $env:MEMORY_BACKEND = "supabase"
-$env:SUPABASE_URL = "https://your-project.supabase.co"
+$env:SUPABASE_URL = "https://iaqvdbifphbvehwuohym.supabase.co"
 $env:SUPABASE_SERVICE_ROLE_KEY = "your-service-role-key"
 ```
-
-Note: the Supabase adapter is scaffolded but not fully implemented yet, so keep `MEMORY_BACKEND=sqlite` for active development right now.
 
 ## Accounts and authentication
 

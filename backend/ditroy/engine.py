@@ -60,7 +60,12 @@ class DitroyEngine:
             supabase_service_role_key=self.config.supabase_service_role_key,
         )
 
-    def chat(self, message: str, conversation_id: str = "default") -> ChatResult:
+    def chat(
+        self,
+        message: str,
+        conversation_id: str = "default",
+        user_id: str | None = None,
+    ) -> ChatResult:
         """Run the full chat pipeline for an incoming user message."""
         prompt = message.strip()
         if not prompt:
@@ -83,12 +88,20 @@ class DitroyEngine:
         reply = self.model_client.generate(model_prompt)
 
         # 5. Persist turns into memory store
-        self.memory_store.add(conversation_id, "user", prompt)
-        self.memory_store.add(conversation_id, "assistant", reply)
+        try:
+            self.memory_store.add(conversation_id, "user", prompt, user_id=user_id)
+            self.memory_store.add(conversation_id, "assistant", reply, user_id=user_id)
+        except TypeError:
+            self.memory_store.add(conversation_id, "user", prompt)
+            self.memory_store.add(conversation_id, "assistant", reply)
 
         return ChatResult(reply=reply, conversation_id=conversation_id)
 
-    def create_conversation(self, source_conversation_id: str = "default") -> ConversationResult:
+    def create_conversation(
+        self,
+        source_conversation_id: str = "default",
+        user_id: str | None = None,
+    ) -> ConversationResult:
         """Create a new conversation session inheriting facts from a source conversation."""
         new_id = str(uuid4())
         self.memory_store.inherit_facts(source_conversation_id, new_id)

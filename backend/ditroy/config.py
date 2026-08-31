@@ -27,8 +27,31 @@ class DitroyConfig:
     supabase_service_role_key: str = ""
 
     @classmethod
-    def from_env(cls) -> DitroyConfig:
-        """Create DitroyConfig loaded from environment variables."""
+    def from_env(cls, env_file: str | Path | None = None) -> DitroyConfig:
+        """Create DitroyConfig loaded from environment variables and local .env files."""
+        # Auto-discover and load .env if present
+        candidates = [Path(env_file)] if env_file else [
+            Path(".env"),
+            Path("backend/.env"),
+            Path(__file__).resolve().parents[2] / ".env",
+            Path(__file__).resolve().parents[1] / ".env",
+        ]
+        for candidate in candidates:
+            if candidate and candidate.is_file():
+                try:
+                    for line in candidate.read_text(encoding="utf-8").splitlines():
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        k, v = line.split("=", 1)
+                        k = k.strip()
+                        v = v.strip().strip("'\"")
+                        if k and k not in os.environ:
+                            os.environ[k] = v
+                except Exception:
+                    pass
+                break
+
         return cls(
             model_provider=os.getenv("MODEL_PROVIDER", "ollama"),
             model_name=os.getenv("MODEL_NAME", os.getenv("OLLAMA_MODEL", "llama3.2")),

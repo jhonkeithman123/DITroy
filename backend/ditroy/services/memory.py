@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
@@ -265,43 +266,192 @@ class SQLiteMemoryStore:
 
 
 class SupabaseMemoryStore:
-    def __init__(self, token_budget: int = 768, supabase_url: str = "", supabase_key: str = ""):
+    def __init__(
+        self,
+        token_budget: int = 768,
+        supabase_url: str = "",
+        supabase_key: str = "",
+        client: Any = None,
+    ):
         self.token_budget = max(8, token_budget)
         self.supabase_url = (supabase_url or "").strip()
         self.supabase_key = (supabase_key or "").strip()
-        if not self.supabase_url or not self.supabase_key:
-            raise ValueError("Supabase backend requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
 
+        if client is not None:
+            self._client = client
+        else:
+            if not self.supabase_url or not self.supabase_key:
+                raise ValueError("Supabase backend requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY")
+
+            try:
+                from supabase import create_client  # type: ignore
+            except ImportError as exc:
+                raise ImportError(
+                    "Supabase backend selected but dependency is missing. Install with: pip install supabase"
+                ) from exc
+
+            self._client = create_client(self.supabase_url, self.supabase_key)
+
+    def _to_uuid(self, val: str) -> str:
+        """Ensure conversation ID conforms to standard PostgreSQL UUID format."""
         try:
-            from supabase import create_client  # type: ignore
-        except ImportError as exc:
-            raise ImportError(
-                "Supabase backend selected but dependency is missing. Install with: pip install supabase"
-            ) from exc
+            return str(uuid.UUID(str(val)))
+        except (ValueError, AttributeError):
+            return str(uuid.uuid5(uuid.NAMESPACE_DNS, str(val)))
 
-        self._client = create_client(self.supabase_url, self.supabase_key)
-        LOGGER.warning(
-            "Supabase memory backend is scaffolded but not fully implemented yet; "
-            "switch back to MEMORY_BACKEND=sqlite for production use today."
-        )
+    def _ensure_conversation(self, cid: str, title: str = "New chat", user_id: str | None = None) -> None:
+        try:
+            res = self._client.table("conversations").select("id").eq("id", cid).execute()
+            if not res.data:
+                payload: dict[str, Any] = {
+                    "id": cid,
+                    "title": self._trim_title(title),
+                    "updated_at": self._now(),
+                }
+                if user_id:
+                    payload["user_id"] = user_id
+                self._client.table("conversations").insert(payload).execute()
+        except Exception as exc:
+            LOGGER.debug("Conversation ensure error (ignoring): %s", exc)
 
-    def add(self, conversation_id: str, role: str, content: str) -> None:
-        raise NotImplementedError("Supabase adapter method add() is not implemented yet")
+    def add(
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
+        user_id: str | None = None,
+        model: str | None = None,
+    ) -> None:
+        cid = self._to_uuid(conversation_id)
+        self._ensure_conversation(cid, title=content if role == "user" else "New chat", user_id=user_id)
 
-    def remember(self, conversation_id: str, fact: str) -> None:
-        raise NotImplementedError("Supabase adapter method remember() is not implemented yet")
+        row: dict[str, Any] = {
+            "conversation_id": cid,
+            "role": role,
+            "content": content.strip(),
+            "created_at": self._now(),
+        }
+        if user_id:
+            row["user_id"] = user_id
+        if model:
+            row["model"] = model
+
+        self._client.table("messages").insert(row).execute()
+        try:
+            self._client.table("conversations").update({"updated_at": self._now()}).eq("id", cid).execute()
+        except Exception:
+            pass
+
+    def remember(self, conversation_id: str, fact: str, user_id: str | None = None) -> None:
+        clean = fact.strip()
+        if not clean:
+            return
+        cid = self._to_uuid(conversation_id)
+        self._ensure_conversation(cid, user_id=user_id)
+
+        # Check if fact already exists for this conversation
+        res = self._client.table("memory_facts").select("id").eq("conversation_id", cid).eq("fact", clean).execute()
+        if not res.data:
+            row: dict[str, Any] = {
+                "conversation_id": cid,
+                "fact": clean,
+                "created_at": self._now(),
+            }
+            if user_id:
+                row["user_id"] = user_id
+            self._client.table("memory_facts").insert(row).execute()
 
     def inherit_facts(self, source_conversation_id: str, target_conversation_id: str) -> None:
-        raise NotImplementedError("Supabase adapter method inherit_facts() is not implemented yet")
+        src_cid = self._to_uuid(source_conversation_id)
+        res = self._client.table("memory_facts").select("fact,user_id").eq("conversation_id", src_cid).execute()
+        facts = res.data or []
+        for item in facts:
+            fact_text = item.get("fact") if isinstance(item, dict) else None
+            if fact_text:
+                self.remember(target_conversation_id, fact_text, user_id=item.get("user_id"))
 
     def fact_count(self, conversation_id: str) -> int:
-        raise NotImplementedError("Supabase adapter method fact_count() is not implemented yet")
+        cid = self._to_uuid(conversation_id)
+        res = self._client.table("memory_facts").select("id", count="exact").eq("conversation_id", cid).execute()
+        if res.count is not None:
+            return int(res.count)
+        return len(res.data or [])
 
     def list_conversations(self) -> list[dict[str, Any]]:
-        raise NotImplementedError("Supabase adapter method list_conversations() is not implemented yet")
+        try:
+            res = (
+                self._client.table("conversations")
+                .select("id,title,created_at,updated_at")
+                .order("updated_at", desc=True)
+                .execute()
+            )
+            if res.data:
+                return [
+                    {
+                        "conversation_id": r["id"],
+                        "title": self._trim_title(r.get("title") or "New chat"),
+                        "updated_at": r.get("updated_at") or r.get("created_at") or self._now(),
+                    }
+                    for r in res.data
+                ]
+        except Exception:
+            pass
+
+        # Fallback to messages table
+        res = self._client.table("messages").select(
+            "conversation_id,role,content,created_at"
+        ).order("created_at", desc=False).execute()
+        rows = res.data or []
+
+        groups: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            cid = row["conversation_id"]
+            created_at = row.get("created_at", "")
+            role = row.get("role", "")
+            content = row.get("content", "")
+            if cid not in groups:
+                groups[cid] = {
+                    "conversation_id": cid,
+                    "title_source": content if role == "user" else "New chat",
+                    "updated_at": created_at,
+                }
+            else:
+                groups[cid]["updated_at"] = max(groups[cid]["updated_at"], created_at)
+                if groups[cid]["title_source"] == "New chat" and role == "user":
+                    groups[cid]["title_source"] = content
+
+        sorted_conversations = sorted(
+            groups.values(),
+            key=lambda x: x["updated_at"],
+            reverse=True,
+        )
+        return [
+            {
+                "conversation_id": item["conversation_id"],
+                "title": self._trim_title(item["title_source"]),
+                "updated_at": item["updated_at"],
+            }
+            for item in sorted_conversations
+        ]
 
     def history(self, conversation_id: str, limit: int = 200) -> list[dict[str, str]]:
-        raise NotImplementedError("Supabase adapter method history() is not implemented yet")
+        cid = self._to_uuid(conversation_id)
+        res = (
+            self._client.table("messages")
+            .select("role,content,created_at")
+            .eq("conversation_id", cid)
+            .order("created_at", desc=False)
+            .limit(max(1, limit))
+            .execute()
+        )
+        return [
+            {
+                "role": row["role"],
+                "content": row["content"],
+                "created_at": row.get("created_at", ""),
+            }
+            for row in (res.data or [])
+        ]
 
     def capture_facts(self, conversation_id: str, content: str) -> list[str]:
         quoted = re.findall(r'"([^"\n]+)"', content)
@@ -311,7 +461,65 @@ class SupabaseMemoryStore:
         return facts
 
     def context(self, conversation_id: str) -> str:
-        raise NotImplementedError("Supabase adapter method context() is not implemented yet")
+        facts = self._facts(conversation_id)
+        recent = self._recent_messages(conversation_id)
+        if not facts and not recent:
+            return ""
+
+        sections = []
+        if facts:
+            sections.append("Saved facts:\n" + "\n".join(f"- {fact}" for fact in facts))
+        if recent:
+            sections.append("Recent conversation:\n" + "\n".join(f"{m['role']}: {m['content']}" for m in recent))
+
+        context = "\n\n".join(sections)
+        if estimate_tokens(context) <= self.token_budget:
+            return context
+
+        budget_chars = self.token_budget * 4
+        compressed = f"{COMPRESSION_MARKER}\n{context}"
+        return compressed[:budget_chars].rstrip()
+
+    def _recent_messages(self, conversation_id: str) -> list[dict[str, str]]:
+        cid = self._to_uuid(conversation_id)
+        res = (
+            self._client.table("messages")
+            .select("role,content,created_at")
+            .eq("conversation_id", cid)
+            .order("created_at", desc=True)
+            .limit(40)
+            .execute()
+        )
+        messages = [
+            {
+                "role": row["role"],
+                "content": row["content"],
+                "created_at": row.get("created_at", ""),
+            }
+            for row in (res.data or [])
+        ]
+        messages.reverse()
+        while estimate_tokens("\n".join(f"{m['role']}: {m['content']}" for m in messages)) > self.token_budget and len(messages) > 1:
+            messages.pop(0)
+        return messages
+
+    def _facts(self, conversation_id: str) -> list[str]:
+        cid = self._to_uuid(conversation_id)
+        res = (
+            self._client.table("memory_facts")
+            .select("fact")
+            .eq("conversation_id", cid)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        return [row["fact"] for row in (res.data or []) if "fact" in row]
+
+    def _now(self) -> str:
+        return datetime.now(timezone.utc).isoformat()
+
+    def _trim_title(self, content: str) -> str:
+        source = (content or "New chat").strip()
+        return source[:52] + ("..." if len(source) > 52 else "")
 
 
 class LocalMemoryStore(SQLiteMemoryStore):
