@@ -22,6 +22,10 @@ export interface ChatRequest {
   conversationId?: string;
   /** Optional user ID for authenticated multi-tenant chats. */
   user_id?: string | null;
+  /** Optional manual max tokens limit. */
+  max_tokens?: number;
+  /** Alias for max_tokens (camelCase). */
+  maxTokens?: number;
 }
 
 export interface ChatResponse {

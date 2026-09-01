@@ -14,14 +14,16 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+DEFAULT_MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2048"))
+
 
 class ModelClient(ABC):
     @abstractmethod
-    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         raise NotImplementedError
 
     @abstractmethod
-    def stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         raise NotImplementedError
 
     @abstractmethod
@@ -30,10 +32,10 @@ class ModelClient(ABC):
 
 
 class StubModelClient(ModelClient):
-    def generate(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         return f"Echo: {prompt}"
 
-    def stream(self, prompt: str, max_tokens: int = 256, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         words = f"Echo: {prompt}".split(" ")
         for i, word in enumerate(words):
             yield word + (" " if i < len(words) - 1 else "")
@@ -49,7 +51,7 @@ class LocalOllamaClient(ModelClient):
         self.base_url = base_url.rstrip("/")
         self.model = model
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         try:
             response = httpx.post(
                 f"{self.base_url}/api/generate",
@@ -75,7 +77,7 @@ class LocalOllamaClient(ModelClient):
             logger.warning("Local model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Local model unavailable. I received: {prompt}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         try:
             with httpx.stream(
                 "POST",
@@ -159,7 +161,7 @@ class GroqModelClient(ModelClient):
         self.model = _normalize_groq_model(model)
         self.base_url = (base_url or "https://api.groq.com/openai/v1").rstrip("/")
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         if not self.api_key:
             self.api_key = os.getenv("GROQ_API_KEY", "").strip()
 
@@ -195,7 +197,7 @@ class GroqModelClient(ModelClient):
             logger.warning("Groq model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Groq unavailable: {exc}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         if not self.api_key:
             self.api_key = os.getenv("GROQ_API_KEY", "").strip()
 
@@ -312,7 +314,7 @@ class GeminiModelClient(ModelClient):
         self.model = _normalize_gemini_model(model)
         self.base_url = (base_url or "https://generativelanguage.googleapis.com/v1beta/openai").rstrip("/")
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         if not self.api_key:
             self.api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
@@ -348,7 +350,7 @@ class GeminiModelClient(ModelClient):
             logger.warning("Gemini model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Gemini unavailable: {exc}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         if not self.api_key:
             self.api_key = os.getenv("GEMINI_API_KEY", "").strip()
 
@@ -460,7 +462,7 @@ class DeepSeekModelClient(ModelClient):
         self.model = _normalize_deepseek_model(model)
         self.base_url = (base_url or "https://api.deepseek.com").rstrip("/")
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         if not self.api_key:
             self.api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
@@ -496,7 +498,7 @@ class DeepSeekModelClient(ModelClient):
             logger.warning("DeepSeek model unavailable. I received: %s | error=%s", prompt, exc)
             return f"DeepSeek unavailable: {exc}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         if not self.api_key:
             self.api_key = os.getenv("DEEPSEEK_API_KEY", "").strip()
 
@@ -604,7 +606,7 @@ class ZAIModelClient(ModelClient):
         self.model = _normalize_zai_model(model)
         self.base_url = (base_url or "https://open.bigmodel.cn/api/paas/v4").rstrip("/")
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         if not self.api_key:
             self.api_key = os.getenv("ZAI_API_KEY", os.getenv("ZHIPU_API_KEY", "")).strip()
 
@@ -640,7 +642,7 @@ class ZAIModelClient(ModelClient):
             logger.warning("Z.AI model unavailable. I received: %s | error=%s", prompt, exc)
             return f"Z.AI unavailable: {exc}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         if not self.api_key:
             self.api_key = os.getenv("ZAI_API_KEY", os.getenv("ZHIPU_API_KEY", "")).strip()
 
@@ -751,7 +753,7 @@ class OpenRouterModelClient(ModelClient):
         self.model = _normalize_openrouter_model(model)
         self.base_url = (base_url or "https://openrouter.ai/api/v1").rstrip("/")
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         if not self.api_key:
             self.api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
 
@@ -785,7 +787,7 @@ class OpenRouterModelClient(ModelClient):
         except (httpx.HTTPError, ValueError, TypeError, KeyError) as exc:
             return f"OpenRouter unavailable: {exc}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         if not self.api_key:
             self.api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
 
@@ -890,7 +892,7 @@ class CascadeModelClient(ModelClient):
         ]
         return any(marker in lower for marker in fail_markers)
 
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7) -> str:
+    def generate(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7) -> str:
         last_error = ""
         for name, client in self.clients:
             try:
@@ -907,7 +909,7 @@ class CascadeModelClient(ModelClient):
 
         return f"All cascade providers failed. Last error: {last_error}"
 
-    def stream(self, prompt: str, max_tokens: int = 512, temperature: float = 0.7):
+    def stream(self, prompt: str, max_tokens: int = DEFAULT_MAX_TOKENS, temperature: float = 0.7):
         last_error = ""
         for name, client in self.clients:
             try:

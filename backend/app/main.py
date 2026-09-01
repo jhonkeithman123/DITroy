@@ -49,6 +49,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1)
     conversation_id: str = Field(default="default", min_length=1, max_length=100)
     user_id: str | None = Field(default=None)
+    max_tokens: int | None = Field(default=None, ge=1, le=32768)
 
     @field_validator("message")
     @classmethod
@@ -214,12 +215,21 @@ def get_conversation_messages(conversation_id: str, limit: int = 200):
 def chat(request: ChatRequest):
     _sync_engine()
     try:
-        result = engine.chat(request.message, request.conversation_id, user_id=request.user_id)
+        result = engine.chat(
+            request.message,
+            request.conversation_id,
+            user_id=request.user_id,
+            max_tokens=request.max_tokens,
+        )
         return ChatResponse(reply=result.reply)
     except Exception as exc:
         logger.error("Error during chat processing: %s", exc, exc_info=True)
         try:
-            fallback_reply = engine.model_client.generate(request.message)
+            effective_max_tokens = request.max_tokens or engine.config.max_tokens
+            try:
+                fallback_reply = engine.model_client.generate(request.message, max_tokens=effective_max_tokens)
+            except TypeError:
+                fallback_reply = engine.model_client.generate(request.message)
             return ChatResponse(reply=fallback_reply)
         except Exception:
             return ChatResponse(reply="I am currently experiencing a temporary processing issue. Please try again.")
@@ -231,7 +241,12 @@ def chat_stream(request: ChatRequest):
 
     def event_generator():
         try:
-            for token in engine.chat_stream(request.message, request.conversation_id, user_id=request.user_id):
+            for token in engine.chat_stream(
+                request.message,
+                request.conversation_id,
+                user_id=request.user_id,
+                max_tokens=request.max_tokens,
+            ):
                 payload = json.dumps({"token": token})
                 yield f"data: {payload}\n\n"
         except Exception as exc:

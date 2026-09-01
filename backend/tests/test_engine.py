@@ -73,3 +73,40 @@ def test_ditroy_engine_custom_identity(tmp_path):
     assert res.reply == "Custom reply"
     assert len(captured_prompts) == 1
     assert "You are RoboAdvisor" in captured_prompts[0]
+
+
+def test_ditroy_engine_max_tokens_propagation(tmp_path):
+    captured = {}
+
+    class TrackingModelClient(StubModelClient):
+        def generate(self, prompt, max_tokens=None, **kwargs):
+            captured["generate_tokens"] = max_tokens
+            return "ok"
+
+        def stream(self, prompt, max_tokens=None, **kwargs):
+            captured["stream_tokens"] = max_tokens
+            yield "token1"
+
+    config = DitroyConfig(
+        max_tokens=2048,
+        memory_backend="sqlite",
+        memory_path=tmp_path / "token_test.sqlite3",
+    )
+    engine = DitroyEngine(config=config, model_client=TrackingModelClient())
+
+    # Default config value passed to generate
+    engine.chat("Test prompt")
+    assert captured["generate_tokens"] == 2048
+
+    # Explicit override passed to generate
+    engine.chat("Test prompt override", max_tokens=4096)
+    assert captured["generate_tokens"] == 4096
+
+    # Default config value passed to stream
+    list(engine.chat_stream("Test stream prompt"))
+    assert captured["stream_tokens"] == 2048
+
+    # Explicit override passed to stream
+    list(engine.chat_stream("Test stream override", max_tokens=1024))
+    assert captured["stream_tokens"] == 1024
+

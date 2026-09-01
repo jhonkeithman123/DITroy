@@ -14,15 +14,15 @@ class DitroyConfig:
     ollama_base_url: str = "http://127.0.0.1:11434"
     model_path: str = ""
     offload_dir: str = "./.offload"
-    max_tokens: int = 512
-    context_tokens: int = 1024
+    max_tokens: int = 2048
+    context_tokens: int = 4096
     enable_rag: bool = False
     embedding_model: str = "all-MiniLM-L6-v2"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     memory_backend: str = "sqlite"
     memory_path: str | Path = "./data/memory.sqlite3"
-    memory_token_budget: int = 768
+    memory_token_budget: int = 2048
     supabase_url: str = ""
     supabase_service_role_key: str = ""
     groq_api_key: str = ""
@@ -81,15 +81,15 @@ class DitroyConfig:
             ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434"),
             model_path=os.getenv("MODEL_PATH", ""),
             offload_dir=os.getenv("OFFLOAD_DIR", "./.offload"),
-            max_tokens=int(os.getenv("MAX_TOKENS", "512")),
-            context_tokens=int(os.getenv("CONTEXT_TOKENS", "1024")),
+            max_tokens=int(os.getenv("MAX_TOKENS", "2048")),
+            context_tokens=int(os.getenv("CONTEXT_TOKENS", "4096")),
             enable_rag=os.getenv("ENABLE_RAG", "false").lower() == "true",
             embedding_model=os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
             api_host=os.getenv("API_HOST", "0.0.0.0"),
             api_port=int(os.getenv("API_PORT", "8000")),
             memory_backend=os.getenv("MEMORY_BACKEND", "sqlite"),
             memory_path=os.getenv("MEMORY_PATH", "./data/memory.sqlite3"),
-            memory_token_budget=int(os.getenv("MEMORY_TOKEN_BUDGET", "768")),
+            memory_token_budget=int(os.getenv("MEMORY_TOKEN_BUDGET", "2048")),
             supabase_url=os.getenv("SUPABASE_URL", ""),
             supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
             groq_api_key=os.getenv("GROQ_API_KEY", ""),

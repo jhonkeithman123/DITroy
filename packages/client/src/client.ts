@@ -119,7 +119,7 @@ export class DitroyClient {
    * @returns ChatResponse containing the AI reply.
    */
   public async chat(request: string | ChatRequest): Promise<ChatResponse> {
-    const payload: { message: string; conversation_id: string; user_id?: string | null } =
+    const payload: { message: string; conversation_id: string; user_id?: string | null; max_tokens?: number } =
       typeof request === "string"
         ? { message: request, conversation_id: "default" }
         : {
@@ -127,6 +127,7 @@ export class DitroyClient {
             conversation_id:
               request.conversation_id || request.conversationId || "default",
             user_id: request.user_id,
+            max_tokens: request.max_tokens ?? request.maxTokens,
           };
 
     return this.request<ChatResponse>("/chat", {
@@ -156,7 +157,7 @@ export class DitroyClient {
       );
     }
 
-    const payload: { message: string; conversation_id: string; user_id?: string | null } =
+    const payload: { message: string; conversation_id: string; user_id?: string | null; max_tokens?: number } =
       typeof request === "string"
         ? { message: request, conversation_id: "default" }
         : {
@@ -164,6 +165,7 @@ export class DitroyClient {
             conversation_id:
               request.conversation_id || request.conversationId || "default",
             user_id: request.user_id,
+            max_tokens: request.max_tokens ?? request.maxTokens,
           };
 
     const url = `${this.baseUrl}/chat/stream`;

@@ -72,6 +72,7 @@ class DitroyEngine:
         message: str,
         conversation_id: str = "default",
         user_id: str | None = None,
+        max_tokens: int | None = None,
     ) -> ChatResult:
         """Run the full chat pipeline for an incoming user message."""
         prompt = message.strip()
@@ -92,7 +93,11 @@ class DitroyEngine:
         )
 
         # 4. Generate reply via model client
-        reply = self.model_client.generate(model_prompt)
+        effective_max_tokens = max_tokens or self.config.max_tokens
+        try:
+            reply = self.model_client.generate(model_prompt, max_tokens=effective_max_tokens)
+        except TypeError:
+            reply = self.model_client.generate(model_prompt)
 
         # 5. Persist turns into memory store
         try:
@@ -109,6 +114,7 @@ class DitroyEngine:
         message: str,
         conversation_id: str = "default",
         user_id: str | None = None,
+        max_tokens: int | None = None,
     ) -> Iterator[str]:
         """Stream chat tokens in real-time while persisting full turns to memory upon completion."""
         prompt = message.strip()
@@ -136,7 +142,13 @@ class DitroyEngine:
 
         # 4. Stream tokens & accumulate response
         chunks: list[str] = []
-        for chunk in self.model_client.stream(model_prompt):
+        effective_max_tokens = max_tokens or self.config.max_tokens
+        try:
+            token_stream = self.model_client.stream(model_prompt, max_tokens=effective_max_tokens)
+        except TypeError:
+            token_stream = self.model_client.stream(model_prompt)
+
+        for chunk in token_stream:
             chunks.append(chunk)
             yield chunk
 

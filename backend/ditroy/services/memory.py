@@ -29,7 +29,7 @@ class MemoryStore(Protocol):
 
 
 class SQLiteMemoryStore:
-    def __init__(self, path: str | Path = "./data/memory.sqlite3", token_budget: int = 768):
+    def __init__(self, path: str | Path = "./data/memory.sqlite3", token_budget: int = 2048):
         self.path = Path(path)
         self.token_budget = max(8, token_budget)
         try:
@@ -280,7 +280,7 @@ class SQLiteMemoryStore:
 class SupabaseMemoryStore:
     def __init__(
         self,
-        token_budget: int = 768,
+        token_budget: int = 2048,
         supabase_url: str = "",
         supabase_key: str = "",
         client: Any = None,
