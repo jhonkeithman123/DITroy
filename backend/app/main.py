@@ -19,6 +19,8 @@ logger = logging.getLogger("ditroy.api")
 app = FastAPI(title="DITroy Personal AI API", version="0.2.0")
 AI_IDENTITY = DEFAULT_AI_IDENTITY
 
+from starlette.middleware.gzip import GZipMiddleware
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -32,6 +34,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 engine = DitroyEngine(
     config=DitroyConfig.from_env(),
@@ -132,38 +135,70 @@ def _verify_cron_secret(
         )
 
 
-@app.get("/")
-def root_index():
-    _sync_engine()
-    return {
-        "status": "ok",
-        "service": "ditroy-ai-backend",
-        "version": "0.2.0",
-        "endpoints": [
-            "/health",
-            "/api/cron/keepalive",
-            "/conversations",
-            "/chat",
-            "/chat/stream",
-        ],
-    }
+_ROOT_INDEX_PAYLOAD = {
+    "status": "ok",
+    "service": "ditroy-ai-backend",
+    "version": "0.2.0",
+    "endpoints": [
+        "/health",
+        "/api/cron/keepalive",
+        "/conversations",
+        "/chat",
+        "/chat/stream",
+    ],
+}
+_ROOT_INDEX_BYTES = json.dumps(_ROOT_INDEX_PAYLOAD).encode("utf-8")
+
+_ROBOTS_TXT_BYTES = b"User-agent: *\nDisallow: /\n"
+
+_SITEMAP_XML_BYTES = (
+    b'<?xml version="1.0" encoding="UTF-8"?>\n'
+    b'<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    b"  <url><loc>http://localhost:8000/</loc></url>\n"
+    b"  <url><loc>http://localhost:8000/health</loc></url>\n"
+    b"</urlset>"
+)
+
+# High-performance caching headers for CDN edge nodes (Cloudflare/Render) and browsers
+_STATIC_CACHE_HEADERS = {
+    "Cache-Control": "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400",
+    "ETag": '"ditroy-v0.2.0"',
+}
+_ROBOTS_CACHE_HEADERS = {
+    "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400",
+    "ETag": '"ditroy-robots-v1"',
+}
+_SITEMAP_CACHE_HEADERS = {
+    "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
+    "ETag": '"ditroy-sitemap-v1"',
+}
+
+
+@app.get("/", response_class=Response)
+async def root_index():
+    return Response(
+        content=_ROOT_INDEX_BYTES,
+        media_type="application/json",
+        headers=_STATIC_CACHE_HEADERS,
+    )
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
-def robots_txt():
-    return "User-agent: *\nDisallow: /\n"
+async def robots_txt():
+    return Response(
+        content=_ROBOTS_TXT_BYTES,
+        media_type="text/plain",
+        headers=_ROBOTS_CACHE_HEADERS,
+    )
 
 
 @app.get("/sitemap.xml", response_class=Response)
-def sitemap_xml():
-    xml = (
-        '<?xml version="1.0" encoding="UTF-8"?>\n'
-        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        "  <url><loc>http://localhost:8000/</loc></url>\n"
-        "  <url><loc>http://localhost:8000/health</loc></url>\n"
-        "</urlset>"
+async def sitemap_xml():
+    return Response(
+        content=_SITEMAP_XML_BYTES,
+        media_type="application/xml",
+        headers=_SITEMAP_CACHE_HEADERS,
     )
-    return Response(content=xml, media_type="application/xml")
 
 
 @app.get("/health")
@@ -191,7 +226,7 @@ def health_check():
     response_model=CronKeepAliveResponse,
     include_in_schema=False,
 )
-def cron_keepalive(
+async def cron_keepalive(
     request: Request,
     authorization: str | None = Header(default=None),
     x_cron_key: str | None = Header(default=None, alias="x-cron-key"),

@@ -878,14 +878,8 @@ class CascadeModelClient(ModelClient):
         self.clients = clients
         primary_name = clients[0][0] if clients else "none"
         primary_model = getattr(clients[0][1], "model", "default") if clients else "none"
-        self._cached_health: dict = {
-            "status": "ok",
-            "provider": "cascade",
-            "active_primary": primary_name,
-            "model": primary_model,
-            "providers": {name: {"status": "ok", "provider": name} for name, _ in clients},
-        }
-        self._cached_health_time = time.time()
+        self._cached_health: dict | None = None
+        self._cached_health_time: float = 0.0
 
     def _is_failed_response(self, text: str) -> bool:
         if not text or not text.strip():

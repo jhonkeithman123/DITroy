@@ -14,6 +14,7 @@
     "test:load": "k6 run loadTester.js",
     "test:load:local": "k6 run -e TARGET_URL=http://localhost:3000 loadTester.js",
     "test:load:live": "k6 run -e TARGET_URL=https://your-domain.vercel.app loadTester.js",
+    "test:load:render": "k6 run -e TARGET_URL=https://ditroy.onrender.com loadTester.js",
     "seeResult": "node -e \"const fs = require('fs'); if (!fs.existsSync('summary.html')) { console.error('❌ summary.html not found. Run a load test first with: npm run test:load:local'); process.exit(1); } const {exec} = require('child_process'); const p = process.platform === 'win32' ? 'start summary.html' : process.platform === 'darwin' ? 'open summary.html' : 'xdg-open summary.html'; exec(p);\"",
     "test:load:all": "k6 run loadTester.js",
     "test:load:frontend": "k6 run -e TARGET_URL=http://localhost:3000 loadTester.js",
