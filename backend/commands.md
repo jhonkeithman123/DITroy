@@ -19,7 +19,12 @@ mamba activate ditroy
 pnpm dev
 ```
 
-The launcher starts or reuses Ollama, warms `llama3.2`, starts FastAPI on port 8000, and starts Next.js on port 3000. Stop the development services with Ctrl+C. Ollama may continue running as a background service.
+### Choose LLM Mode
+- **Cloud LLM (Default)**: `pnpm dev` or `pnpm dev:cloud` (routes to Groq -> Gemini -> DeepSeek -> Z.AI -> OpenRouter, skips Ollama).
+- **Local Ollama**: `pnpm dev:ollama` or `pnpm dev --ollama` (starts local Ollama and warms `llama3.2`).
+- **Production Backend Only**: `pnpm start:backend` or `pnpm start:backend:ollama`.
+
+The launcher starts FastAPI on port 8000 and Next.js on port 3000. Stop services with Ctrl+C.
 
 ## First-time model setup
 

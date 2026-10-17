@@ -874,7 +874,18 @@ class CascadeModelClient(ModelClient):
     """
 
     def __init__(self, clients: list[tuple[str, ModelClient]]):
+        import time
         self.clients = clients
+        primary_name = clients[0][0] if clients else "none"
+        primary_model = getattr(clients[0][1], "model", "default") if clients else "none"
+        self._cached_health: dict = {
+            "status": "ok",
+            "provider": "cascade",
+            "active_primary": primary_name,
+            "model": primary_model,
+            "providers": {name: {"status": "ok", "provider": name} for name, _ in clients},
+        }
+        self._cached_health_time = time.time()
 
     def _is_failed_response(self, text: str) -> bool:
         if not text or not text.strip():
@@ -937,7 +948,15 @@ class CascadeModelClient(ModelClient):
 
         yield f" [All cascade providers failed: {last_error}]"
 
+    _cached_health: dict | None = None
+    _cached_health_time: float = 0.0
+
     def health_check(self) -> dict:
+        import time
+        now = time.time()
+        if self._cached_health and (now - self._cached_health_time) < 30.0:
+            return self._cached_health
+
         statuses = {}
         active_provider = None
         for name, client in self.clients:
@@ -946,12 +965,15 @@ class CascadeModelClient(ModelClient):
             if chk.get("status") == "ok" and active_provider is None:
                 active_provider = name
 
-        return {
+        res = {
             "status": "ok" if active_provider else "degraded",
             "provider": "cascade",
             "active_primary": active_provider or "none",
             "providers": statuses,
         }
+        self._cached_health = res
+        self._cached_health_time = now
+        return res
 
 
 class CustomOllamaClient(LocalOllamaClient):

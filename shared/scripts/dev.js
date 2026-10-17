@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 const { spawn } = require("node:child_process");
+const fs = require("node:fs");
 const http = require("node:http");
 const net = require("node:net");
 const path = require("node:path");
@@ -8,26 +9,53 @@ const root = path.resolve(__dirname, "../..");
 const children = [];
 const model = "llama3.2";
 
+function getModelProvider(args = process.argv.slice(2)) {
+  if (args.includes("--ollama") || args.includes("-o") || args.includes("ollama")) {
+    return "ollama";
+  }
+  if (args.includes("--cloud") || args.includes("-c") || args.includes("cloud")) {
+    return "fallback";
+  }
+  if (process.env.MODEL_PROVIDER) {
+    return process.env.MODEL_PROVIDER.toLowerCase();
+  }
+  const envPath = path.join(root, "backend", ".env");
+  if (fs.existsSync(envPath)) {
+    try {
+      const content = fs.readFileSync(envPath, "utf-8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith("MODEL_PROVIDER=")) {
+          return trimmed.split("=")[1].trim().replace(/^['"]|['"]$/g, "").toLowerCase();
+        }
+      }
+    } catch (_) {}
+  }
+  return "fallback";
+}
+
 function printHelp() {
-  console.log(`Ditroy local development launcher
+  console.log(`Ditroy launcher
 
 Usage:
-  pnpm dev             Start Ollama, the FastAPI backend, and Next.js
-  pnpm dev help        Show this help message
-  pnpm dev --help      Show this help message
+  pnpm dev                    Start services with default provider (.env / Cloud LLM)
+  pnpm dev --cloud            Start services forcing Cloud LLM mode (skips Ollama)
+  pnpm dev --ollama           Start services forcing local Ollama mode (starts & warms llama3.2)
+  pnpm dev --backend-only     Start only the FastAPI backend (skips frontend)
+  pnpm dev --prod             Start in production mode (no auto-reload)
+  pnpm dev help               Show this help message
+
+Options:
+  --cloud, -c                 Use Cloud LLM cascade (Groq -> Gemini -> DeepSeek -> Z.AI -> OpenRouter)
+  --ollama, -o                Use local Ollama (llama3.2) with automatic startup and warming
+  --backend-only, -b          Start backend only (port 8000)
+  --prod, -p                  Run backend in production mode without file reloading
 
 Services:
-  Ollama               http://127.0.0.1:11434
-  FastAPI backend      http://127.0.0.1:8000
-  Next.js frontend     http://localhost:3000
-
-Requirements:
-  Activate the mamba environment named ditroy before starting.
-  Pull the model once with: ollama pull llama3.2
-
-Port behavior:
-  The launcher stops if port 8000 or 3000 is already in use.
-  Stop the existing program, then run pnpm dev again.`);
+  Ollama                      http://127.0.0.1:11434 (when active)
+  FastAPI backend             http://127.0.0.1:8000
+  Next.js frontend            http://localhost:3000
+`);
 }
 
 function isPortAvailable(port) {
@@ -119,25 +147,29 @@ function start(command, args, options = {}) {
 }
 
 async function main() {
-  const command = process.argv[2];
-  if (command === "help" || command === "--help" || command === "-h") {
+  const args = process.argv.slice(2);
+  if (args.includes("help") || args.includes("--help") || args.includes("-h")) {
     printHelp();
     return;
   }
 
-  if (command) {
-    console.error(`Unknown command: ${command}`);
-    printHelp();
-    process.exitCode = 1;
-    return;
+  const isProd = args.includes("--prod") || args.includes("-p") || args.includes("prod");
+  const isBackendOnly = args.includes("--backend-only") || args.includes("-b") || args.includes("backend");
+  const provider = getModelProvider(args);
+  const isCloudProvider = provider !== "ollama";
+
+  const portChecks = [isPortAvailable(8000)];
+  if (!isBackendOnly) {
+    portChecks.push(isPortAvailable(3000));
+  }
+  if (!isCloudProvider) {
+    portChecks.push(isOllamaRunning());
   }
 
-  const [backendAvailable, frontendAvailable, ollamaRunning] =
-    await Promise.all([
-      isPortAvailable(8000),
-      isPortAvailable(3000),
-      isOllamaRunning(),
-    ]);
+  const results = await Promise.all(portChecks);
+  const backendAvailable = results[0];
+  const frontendAvailable = isBackendOnly ? true : results[1];
+  const ollamaRunning = isCloudProvider ? false : (isBackendOnly ? results[1] : results[2]);
 
   if (!backendAvailable || !frontendAvailable) {
     const occupied = [
@@ -153,38 +185,67 @@ async function main() {
     return;
   }
 
-  if (ollamaRunning) {
-    console.log("Ollama is already running on 127.0.0.1:11434. Reusing it.");
+  if (isCloudProvider) {
+    console.log(`Connected to cloud LLM provider (${provider}). Skipping Ollama.`);
   } else {
-    start("ollama", ["serve"]);
+    console.log("Using local Ollama mode.");
+    if (ollamaRunning) {
+      console.log("Ollama is already running on 127.0.0.1:11434. Reusing it.");
+    } else {
+      console.log("Starting Ollama service...");
+      start("ollama", ["serve"]);
+    }
+
+    await waitForOllama();
+    await warmModel();
   }
 
-  await waitForOllama();
-  await warmModel();
+  function getPythonPath() {
+    if (process.env.CONDA_PREFIX) {
+      return path.join(process.env.CONDA_PREFIX, "python.exe");
+    }
+    const mambaDitroyPython = "C:\\tools\\mambaforge\\envs\\ditroy\\python.exe";
+    if (fs.existsSync(mambaDitroyPython)) {
+      return mambaDitroyPython;
+    }
+    return "python";
+  }
 
-  const python = process.env.CONDA_PREFIX
-    ? path.join(process.env.CONDA_PREFIX, "python.exe")
-    : "python";
+  const python = getPythonPath();
+  
+  const uvicornArgs = [
+    "-m",
+    "uvicorn",
+    "app.main:app",
+    "--host",
+    "0.0.0.0",
+    "--port",
+    "8000",
+  ];
+  if (!isProd) {
+    uvicornArgs.push("--reload");
+  }
+
+  console.log(`Starting FastAPI backend [${isProd ? "production" : "development"}] on port 8000...`);
   start(
     python,
-    [
-      "-m",
-      "uvicorn",
-      "app.main:app",
-      "--reload",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      "8000",
-    ],
+    uvicornArgs,
     {
       cwd: path.join(root, "backend"),
+      env: {
+        ...process.env,
+        MODEL_PROVIDER: provider,
+      },
     },
   );
-  start(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["exec", "next", "dev", "-p", "3000"], {
-    cwd: path.join(root, "frontend"),
-    shell: process.platform === "win32",
-  });
+
+  if (!isBackendOnly) {
+    console.log("Starting Next.js frontend on port 3000...");
+    start(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["exec", "next", "dev", "-p", "3000"], {
+      cwd: path.join(root, "frontend"),
+      shell: process.platform === "win32",
+    });
+  }
 }
 
 function stopAll() {

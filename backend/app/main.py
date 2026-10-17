@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from ditroy.config import DitroyConfig
@@ -130,6 +130,40 @@ def _verify_cron_secret(
             status_code=401,
             detail="Unauthorized: invalid or missing cron keepalive secret token",
         )
+
+
+@app.get("/")
+def root_index():
+    _sync_engine()
+    return {
+        "status": "ok",
+        "service": "ditroy-ai-backend",
+        "version": "0.2.0",
+        "endpoints": [
+            "/health",
+            "/api/cron/keepalive",
+            "/conversations",
+            "/chat",
+            "/chat/stream",
+        ],
+    }
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt():
+    return "User-agent: *\nDisallow: /\n"
+
+
+@app.get("/sitemap.xml", response_class=Response)
+def sitemap_xml():
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        "  <url><loc>http://localhost:8000/</loc></url>\n"
+        "  <url><loc>http://localhost:8000/health</loc></url>\n"
+        "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
 
 
 @app.get("/health")
